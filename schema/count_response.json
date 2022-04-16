@@ -7,8 +7,7 @@
   ],
   "properties": {
     "count": {
-      "type": "integer",
-      "format": "int32"
+      "type": "string"
     }
   }
 }
