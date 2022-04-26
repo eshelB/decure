@@ -2,7 +2,7 @@ use cosmwasm_std::{debug_print, to_binary, Api, Binary, Env, Extern, HandleRespo
 
 use crate::msg::{CountResponse, HandleMsg, InitMsg, QueryMsg};
 use crate::state::{config, config_read, State};
-use secret_toolkit::snip20::{balance_query};
+use secret_toolkit::snip20::{balance_query, Balance};
 
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
@@ -80,9 +80,9 @@ fn query_count<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdRes
     let callback_code_hash = "E47144CD74E2E3E24275962CAA7719F081CCFA81A46532812596CA3D5BA6ECEB".to_string();
     let contract_addr = HumanAddr("secret18vd8fpwxzck93qlwghaj6arh4p7c5n8978vsyg".to_string());
 
-    let balance =
+    let balance: Balance =
         balance_query(&deps.querier, address, key, block_size, callback_code_hash, contract_addr)?;
-    let balance_s = format!("the balance returned from the query is {:?}", balance);
+    let balance_s = format!("the balance returned from the query is {:?}", balance.amount.u128());
     Ok(CountResponse { count: balance_s })
 }
 
