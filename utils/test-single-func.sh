@@ -168,11 +168,11 @@ function log_test_header() {
 function test_wrong_query_variant() {
     set -e
     local contract_addr="$1"
+    log testing on contract "$contract_addr"
 
     log_test_header
     expected_error="Error: this is the expected error"
 
-    key=a
     result="$(compute_query "$contract_addr" '{"get_count":{}}' 2>&1 || true )"
     result_comparable=$(echo $result | sed 's/Usage:.*//' | awk '{$1=$1};1')
 
@@ -194,7 +194,7 @@ function main() {
     current_dir=$(pwd)
 
     local contract_addr
-    contract_addr="secret18vd8fpwxzck93qlwghaj6arh4p7c5n8978vsyg"
+    contract_addr="secret10pyejy66429refv3g35g2t7am0was7ya6hvrzf"
 
     # this script should only be run from the project's root dir
     assert_eq "$current_dir" "/home/esh/Development/projects/decure"

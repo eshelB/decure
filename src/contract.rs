@@ -74,10 +74,10 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
 
 fn query_count<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdResult<CountResponse> {
     // address whose balance is being requested:
-    let address = HumanAddr("secret1meqx24mankklnskpdyud29wx0p8cqmh4vz6s0z".to_string());
-    let key = "THE_VIEWING_KEY_PREVIOUSLY_SET_BY_THE_ADDRESS".to_string();
+    let address = HumanAddr("secret1ap26qrlp8mcq2pg6r47w43l0y8zkqm8a450s03".to_string());
+    let key = "vk".to_string();
     let block_size = 256;
-    let callback_code_hash = "TOKEN_CONTRACT_CODE_HASH".to_string();
+    let callback_code_hash = "E47144CD74E2E3E24275962CAA7719F081CCFA81A46532812596CA3D5BA6ECEB".to_string();
     let contract_addr = HumanAddr("secret18vd8fpwxzck93qlwghaj6arh4p7c5n8978vsyg".to_string());
 
     let balance =

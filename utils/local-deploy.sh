@@ -131,7 +131,12 @@ function check_tx() {
 
 # Extract the tx_hash from the output of the command
 function tx_of() {
-    "$@" | jq -r '.txhash'
+    # log getting tx hash
+    local result
+    result=$("$@")
+    # log the result is
+    # log "$result"
+    echo "$result" | jq -r '.txhash'
 }
 
 # Extract the output_data_as_string from the output of the command
@@ -453,6 +458,7 @@ function main() {
     set -e
     log '              <####> Starting local deploy <####>'
     log "secretcli version in the docker image is: $(secretcli version)"
+    secretcli config output json
 
     local container_hash
     container_hash=$(docker ps | grep mydev | cut -d " " -f 1)
