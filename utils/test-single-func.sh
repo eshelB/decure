@@ -193,13 +193,16 @@ function main() {
     local current_dir
     current_dir=$(pwd)
 
-    local contract_addr
-    contract_addr="secret10pyejy66429refv3g35g2t7am0was7ya6hvrzf"
+    log "getting last contract code"
+    last_code=$(secretcli query compute list-code | jq ".[-1].id")
+    log "last code is $last_code"
+    last_address=$(secretcli query compute list-contract-by-code $last_code | jq ".[0].address" | tr -d '"')
+    log "last address is $last_address"
 
     # this script should only be run from the project's root dir
     assert_eq "$current_dir" "/home/esh/Development/projects/decure"
 
-    test_wrong_query_variant "$contract_addr"
+    test_wrong_query_variant "$last_address"
 
     log 'test single func completed successfully'
     return 0
