@@ -7,6 +7,10 @@ use secret_toolkit::snip20::{transfer_history_query, TransferHistory};
 use crate::msg::{CountResponse, HandleAnswer, HandleMsg, InitMsg, QueryMsg};
 use crate::state::{config, State};
 
+// constants:
+const MAX_DESCRIPTION_LENGTH: u8 = 40;
+const MAX_NAME_LENGTH: u8 = 20;
+
 // use secret_toolkit::snip20::{transaction_history_query, TransactionHistory};
 // use secret_toolkit::snip20::{balance_query, Balance};
 
@@ -50,10 +54,24 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
 fn register_business<S: Storage, A: Api, Q: Querier>(
     _deps: &mut Extern<S, A, Q>,
     _env: Env,
-    _name: String,
+    name: String,
     _address: HumanAddr,
-    _description: String,
+    description: String,
 ) -> StdResult<HandleAnswer> {
+    if description.chars().count() as u8 > MAX_DESCRIPTION_LENGTH {
+        return Err(StdError::generic_err(format!(
+            "Description length can't be bigger than {}",
+            MAX_DESCRIPTION_LENGTH
+        )));
+    }
+
+    if name.chars().count() as u8 > MAX_NAME_LENGTH {
+        return Err(StdError::generic_err(format!(
+            "Name length can't be bigger than {}",
+            MAX_NAME_LENGTH
+        )));
+    }
+
     Ok(HandleAnswer::RegisterBusiness {
         status: "successfully called register business".to_string(),
     })
@@ -165,17 +183,72 @@ mod tests {
             address: HumanAddr("mock-address".to_string()),
         };
         let res = handle(&mut deps, env, msg);
-        println!("res: {:?}", res);
+        // println!("res: {:?}", res);
         let res2 = res.unwrap();
-        println!("res2: {:?}", res2);
+        // println!("res2: {:?}", res2);
         let res3 = res2.data;
-        println!("res3: {:?}", res3);
+        // println!("res3: {:?}", res3);
         let res4 = res3.unwrap();
-        println!("res4: {:?}", res4);
+        // println!("res4: {:?}", res4);
         let res5: StdResult<HandleAnswer> = from_binary(&res4);
-        println!("res5: {:?}", res5);
+        // println!("res5: {:?}", res5);
         let res6: HandleAnswer = res5.unwrap();
-        println!("res6: {:?}", res6);
-        // assert_eq!("successfully called register business", value.data.status);
+        // println!("res6: {:?}", res6);
+        match res6 {
+            HandleAnswer::RegisterBusiness { status } => {
+                assert_eq!("successfully called register business", status);
+                println!("success")
+            }
+        }
+    }
+
+    #[test]
+    fn register_business_long_name() {
+        let mut deps = mock_dependencies(20, &coins(2, "token"));
+
+        let msg = InitMsg { count: 17 };
+        let env = mock_env("creator", &coins(2, "token"));
+        let _res = init(&mut deps, env, msg).unwrap();
+
+        let env = mock_env("anyone", &coins(2, "token"));
+        let msg = HandleMsg::RegisterBusiness {
+            name: "NameIs21Characters...".to_string(),
+            description: "a place to eat".to_string(),
+            address: HumanAddr("mock-address".to_string()),
+        };
+
+        let res = handle(&mut deps, env, msg);
+        let error = res.unwrap_err();
+
+        if let StdError::GenericErr { msg, .. } = error {
+            assert_eq!("Name length can't be bigger than 20", msg)
+        } else {
+            panic!("there should be a generic error here")
+        }
+    }
+
+    #[test]
+    fn register_business_long_description() {
+        let mut deps = mock_dependencies(20, &coins(2, "token"));
+
+        let msg = InitMsg { count: 17 };
+        let env = mock_env("creator", &coins(2, "token"));
+        let _res = init(&mut deps, env, msg).unwrap();
+
+        let env = mock_env("anyone", &coins(2, "token"));
+        let msg = HandleMsg::RegisterBusiness {
+            name: "Scrt Labs".to_string(),
+            description: "DescriptionIs43CharactersLongWhichIsTooMuch".to_string(),
+            address: HumanAddr("mock-address".to_string()),
+        };
+
+        let res = handle(&mut deps, env, msg);
+        let error = res.unwrap_err();
+
+        if let StdError::GenericErr { msg, .. } = error {
+            assert_eq!("Description length can't be bigger than 40", msg)
+        } else {
+            panic!("there should be a generic error here")
+        }
     }
 }
