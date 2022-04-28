@@ -52,10 +52,10 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
 }
 
 fn register_business<S: Storage, A: Api, Q: Querier>(
-    _deps: &mut Extern<S, A, Q>,
+    deps: &mut Extern<S, A, Q>,
     _env: Env,
     name: String,
-    _address: HumanAddr,
+    address: HumanAddr,
     description: String,
 ) -> StdResult<HandleAnswer> {
     if description.chars().count() as u8 > MAX_DESCRIPTION_LENGTH {
@@ -71,6 +71,9 @@ fn register_business<S: Storage, A: Api, Q: Querier>(
             MAX_NAME_LENGTH
         )));
     }
+
+    // check that a correctly formatted address was given
+    deps.api.canonical_address(&address)?;
 
     Ok(HandleAnswer::RegisterBusiness {
         status: "successfully called register business".to_string(),

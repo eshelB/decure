@@ -216,6 +216,24 @@ function test_register_business_long_description() {
     log "register business long description: SUCCESS!"
 }
 
+function test_register_business_bad_address() {
+    set -e
+    local contract_addr="$1"
+
+    log_test_header
+    expected_error="Error: this is the expected error"
+
+    register_business_message='{"register_business":{"name":"shortName","description":"short description","address":"bad-address"}}'
+    tx_hash="$(compute_execute "$contract_addr" "$register_business_message" --from a --gas 150000 -y)"
+    # Notice the `!` before the command - it is EXPECTED to fail.
+    ! register_business_response="$(wait_for_compute_tx "$tx_hash" "waiting for register business")"
+    assert_eq \
+        "$(get_generic_err "$register_business_response")" \
+        "canonicalize_address errored: missing human-readable separator, \"1\""
+
+    log "register business long description: SUCCESS!"
+}
+
 function main() {
     set -e
     log '              <####> Starting single-function test <####>'
@@ -240,7 +258,8 @@ function main() {
 
     # test_wrong_query_variant "$last_address"
     # test_register_business_long_name "$last_address"
-    test_register_business_long_description "$last_address"
+    # test_register_business_long_description "$last_address"
+    test_register_business_bad_address "$last_address"
 
     log 'test single func completed successfully'
     return 0
