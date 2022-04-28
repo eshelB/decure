@@ -289,12 +289,30 @@ function test_query() {
     log_test_header
     expected_error="Error: this is the expected error"
 
-    key=a
     result="$(compute_query "$contract_addr" "" 2>&1 || true )"
     result_comparable=$(echo $result | sed 's/Usage:.*//' | awk '{$1=$1};1')
 
     assert_eq "$result_comparable" "$expected_error"
     log "no contract in permit: ASSERTION_SUCCESS"
+}
+
+function test_register_business() {
+    set -e
+    local contract_addr="$1"
+
+    log_test_header
+    expected_error="Error: this is the expected error"
+
+    register_business_message='{"register_business":{"name":"Starbucks","description":"a place to eat","address":"address"}}'
+    tx_hash="$(compute_execute "$contract_addr" "$register_business_message" --from a --gas 150000 -y)"
+    register_business_result="$(data_of wait_for_compute_tx "$tx_hash" 'waiting for register_business from "a" to process')"
+    log result "$register_business_result"
+    local status
+    status=$(jq -er '.register_business.status' <<< "$register_business_result")
+
+    assert_eq "$status" "successfully called register business"
+
+    log "register business: SUCCESS!"
 }
 
 function test_wrong_query_variant() {
@@ -490,7 +508,8 @@ function main() {
     dir="code"
     contract_addr="$(create_contract "$dir" "$init_msg")"
 
-    test_wrong_query_variant "$contract_addr"
+    # test_wrong_query_variant "$contract_addr"
+    test_register_business "$contract_addr"
     # test_query "$contract_addr"
     # test_add "$contract_addr"
     # test_sub "$contract_addr"

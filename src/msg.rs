@@ -1,16 +1,27 @@
+use cosmwasm_std::HumanAddr;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
 pub struct InitMsg {
     pub count: i32,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum HandleMsg {
-    Increment {},
-    Reset { count: i32 },
+    RegisterBusiness {
+        name: String,
+        address: HumanAddr,
+        description: String,
+    },
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum HandleAnswer {
+    RegisterBusiness { status: String },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

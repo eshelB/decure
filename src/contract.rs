@@ -4,7 +4,7 @@ use cosmwasm_std::{
 };
 use secret_toolkit::snip20::{transfer_history_query, TransferHistory};
 
-use crate::msg::{CountResponse, HandleMsg, InitMsg, QueryMsg};
+use crate::msg::{CountResponse, HandleAnswer, HandleMsg, InitMsg, QueryMsg};
 use crate::state::{config, State};
 
 // use secret_toolkit::snip20::{transaction_history_query, TransactionHistory};
@@ -32,10 +32,31 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     env: Env,
     msg: HandleMsg,
 ) -> StdResult<HandleResponse> {
-    match msg {
-        HandleMsg::Increment {} => try_increment(deps, env),
-        HandleMsg::Reset { count } => try_reset(deps, env, count),
-    }
+    let answer = match msg {
+        HandleMsg::RegisterBusiness {
+            name,
+            address,
+            description,
+        } => register_business(deps, env, name, address, description)?,
+    };
+
+    Ok(HandleResponse {
+        messages: vec![],
+        log: vec![],
+        data: Some(to_binary(&answer)?),
+    })
+}
+
+fn register_business<S: Storage, A: Api, Q: Querier>(
+    _deps: &mut Extern<S, A, Q>,
+    _env: Env,
+    _name: String,
+    _address: HumanAddr,
+    _description: String,
+) -> StdResult<HandleAnswer> {
+    Ok(HandleAnswer::RegisterBusiness {
+        status: "successfully called register business".to_string(),
+    })
 }
 
 pub fn try_increment<S: Storage, A: Api, Q: Querier>(
@@ -125,27 +146,36 @@ fn query_count<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdRes
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env};
-    use cosmwasm_std::{coins, from_binary, StdError};
+    use cosmwasm_std::{coins, from_binary};
 
     use super::*;
 
     #[test]
-    fn increment() {
+    fn register_business() {
         let mut deps = mock_dependencies(20, &coins(2, "token"));
 
         let msg = InitMsg { count: 17 };
         let env = mock_env("creator", &coins(2, "token"));
         let _res = init(&mut deps, env, msg).unwrap();
 
-        // anyone can increment
         let env = mock_env("anyone", &coins(2, "token"));
-        let msg = HandleMsg::Increment {};
-        let _res = handle(&mut deps, env, msg).unwrap();
-
-        // should increase counter by 1
-        let res = query(&deps, QueryMsg::GetCount {}).unwrap();
-        let value: CountResponse = from_binary(&res).unwrap();
-        println!("the response is {:?}", value.count);
-        assert_eq!("This is an example response", value.count);
+        let msg = HandleMsg::RegisterBusiness {
+            name: "Starbucks".to_string(),
+            description: "a place to eat".to_string(),
+            address: HumanAddr("mock-address".to_string()),
+        };
+        let res = handle(&mut deps, env, msg);
+        println!("res: {:?}", res);
+        let res2 = res.unwrap();
+        println!("res2: {:?}", res2);
+        let res3 = res2.data;
+        println!("res3: {:?}", res3);
+        let res4 = res3.unwrap();
+        println!("res4: {:?}", res4);
+        let res5: StdResult<HandleAnswer> = from_binary(&res4);
+        println!("res5: {:?}", res5);
+        let res6: HandleAnswer = res5.unwrap();
+        println!("res6: {:?}", res6);
+        // assert_eq!("successfully called register business", value.data.status);
     }
 }
