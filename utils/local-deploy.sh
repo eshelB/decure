@@ -315,6 +315,42 @@ function test_register_business() {
     log "register business: SUCCESS!"
 }
 
+function test_register_business_long_name() {
+    set -e
+    local contract_addr="$1"
+
+    log_test_header
+    expected_error="Error: this is the expected error"
+
+    register_business_message='{"register_business":{"name":"AVeryLongNameForABusinessIsNotAccepted","description":"a place to eat","address":"address"}}'
+    tx_hash="$(compute_execute "$contract_addr" "$register_business_message" --from a --gas 150000 -y)"
+    # Notice the `!` before the command - it is EXPECTED to fail.
+    ! register_business_response="$(wait_for_compute_tx "$tx_hash" "waiting for register business")"
+    assert_eq \
+        "$(get_generic_err "$register_business_response")" \
+        "Name length can't be bigger than 20"
+
+    log "register business long name: SUCCESS!"
+}
+
+function test_register_business_long_description() {
+    set -e
+    local contract_addr="$1"
+
+    log_test_header
+    expected_error="Error: this is the expected error"
+
+    register_business_message='{"register_business":{"name":"shortName","description":"a place to eat with a very long description","address":"address"}}'
+    tx_hash="$(compute_execute "$contract_addr" "$register_business_message" --from a --gas 150000 -y)"
+    # Notice the `!` before the command - it is EXPECTED to fail.
+    ! register_business_response="$(wait_for_compute_tx "$tx_hash" "waiting for register business")"
+    assert_eq \
+        "$(get_generic_err "$register_business_response")" \
+        "Description length can't be bigger than 40"
+
+    log "register business long description: SUCCESS!"
+}
+
 function test_wrong_query_variant() {
     set -e
     local contract_addr="$1"
@@ -508,16 +544,9 @@ function main() {
     dir="code"
     contract_addr="$(create_contract "$dir" "$init_msg")"
 
-    # test_wrong_query_variant "$contract_addr"
-    test_register_business "$contract_addr"
-    # test_query "$contract_addr"
-    # test_add "$contract_addr"
-    # test_sub "$contract_addr"
-    # test_mul "$contract_addr"
-    # test_div "$contract_addr"
-    # test_div_by_zero "$contract_addr"
-    # test_sqrt "$contract_addr"
-    # test_query_with_permit_after "$contract_addr"
+    # test_register_business "$contract_addr"
+    # test_register_business_long_name "$contract_addr"
+    test_register_business_long_description "$contract_addr"
 
     log 'deploy + test completed successfully'
 

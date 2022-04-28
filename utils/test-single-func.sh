@@ -180,6 +180,42 @@ function test_wrong_query_variant() {
     log "wrong query variant: SUCCESS!"
 }
 
+function test_register_business_long_name() {
+    set -e
+    local contract_addr="$1"
+
+    log_test_header
+    expected_error="Error: this is the expected error"
+
+    register_business_message='{"register_business":{"name":"AVeryLongNameForABusinessIsNotAccepted","description":"a place to eat","address":"address"}}'
+    tx_hash="$(compute_execute "$contract_addr" "$register_business_message" --from a --gas 150000 -y)"
+    # Notice the `!` before the command - it is EXPECTED to fail.
+    ! register_business_response="$(wait_for_compute_tx "$tx_hash" "waiting for register business")"
+    assert_eq \
+        "$(get_generic_err "$register_business_response")" \
+        "Name length can't be bigger than 20"
+
+    log "register business long name: SUCCESS!"
+}
+
+function test_register_business_long_description() {
+    set -e
+    local contract_addr="$1"
+
+    log_test_header
+    expected_error="Error: this is the expected error"
+
+    register_business_message='{"register_business":{"name":"shortName","description":"a place to eat with a very long description","address":"address"}}'
+    tx_hash="$(compute_execute "$contract_addr" "$register_business_message" --from a --gas 150000 -y)"
+    # Notice the `!` before the command - it is EXPECTED to fail.
+    ! register_business_response="$(wait_for_compute_tx "$tx_hash" "waiting for register business")"
+    assert_eq \
+        "$(get_generic_err "$register_business_response")" \
+        "Description length can't be bigger than 40"
+
+    log "register business long description: SUCCESS!"
+}
+
 function main() {
     set -e
     log '              <####> Starting single-function test <####>'
@@ -202,7 +238,9 @@ function main() {
     # this script should only be run from the project's root dir
     assert_eq "$current_dir" "/home/esh/Development/projects/decure"
 
-    test_wrong_query_variant "$last_address"
+    # test_wrong_query_variant "$last_address"
+    # test_register_business_long_name "$last_address"
+    test_register_business_long_description "$last_address"
 
     log 'test single func completed successfully'
     return 0
