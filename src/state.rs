@@ -1,21 +1,47 @@
+use cosmwasm_std::{CanonicalAddr, StdError, StdResult, Storage, Uint128};
+use cosmwasm_storage::{
+    singleton, singleton_read, PrefixedStorage, ReadonlySingleton, Singleton, TypedStorage,
+};
 use schemars::JsonSchema;
+use secret_toolkit::storage::AppendStoreMut;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{CanonicalAddr, Storage};
-use cosmwasm_storage::{singleton, singleton_read, ReadonlySingleton, Singleton};
-
-pub static CONFIG_KEY: &[u8] = b"config";
+pub static PREFIX_BUSINESSES: &[u8] = b"businesses";
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct State {
-    pub count: i32,
-    pub owner: CanonicalAddr,
+#[serde(rename_all = "snake_case")]
+pub struct Business {
+    pub name: String,
+    pub description: String,
+    pub average_rating: i32, // max - maxint-i32 min-0
+    pub reviews_count: i32,
+    pub total_weight: Uint128,
 }
 
-pub fn config<S: Storage>(storage: &mut S) -> Singleton<S, State> {
-    singleton(storage, CONFIG_KEY)
+fn create_business<S: Storage>(
+    store: &mut S,
+    business: &Business,
+    address: &CanonicalAddr,
+) -> StdResult<()> {
+    let mut store = PrefixedStorage::new(&PREFIX_BUSINESSES, store);
+    let mut store = TypedStorage::<_, Business>::new(&mut store);
+
+    let existing_business = store.may_load(address.as_slice())?;
+
+    match existing_business {
+        Some(..) => Err(StdError::generic_err(format!(
+            "A business is already registered on that address",
+        ))),
+        None(..) => store.save(address.as_slice(), &business),
+    }
 }
 
-pub fn config_read<S: Storage>(storage: &S) -> ReadonlySingleton<S, State> {
-    singleton_read(storage, CONFIG_KEY)
+fn get_business_by_address<S: Storage>(
+    store: &mut S,
+    address: &CanonicalAddr,
+) -> StdResult<Option<Business>> {
+    let mut store = PrefixedStorage::new(&PREFIX_BUSINESSES, store);
+    let mut store = TypedStorage::<_, Business>::new(&mut store);
+
+    store.may_load(address.as_slice())
 }
