@@ -2,7 +2,8 @@ use cosmwasm_std::{debug_print, to_binary, Api, Binary, Env, Extern, HandleRespo
 
 use crate::msg::{CountResponse, HandleMsg, InitMsg, QueryMsg};
 use crate::state::{config, State};
-use secret_toolkit::snip20::{transaction_history_query, TransactionHistory};
+use secret_toolkit::snip20::{transfer_history_query, TransferHistory};
+// use secret_toolkit::snip20::{transaction_history_query, TransactionHistory};
 // use secret_toolkit::snip20::{balance_query, Balance};
 
 pub fn init<S: Storage, A: Api, Q: Querier>(
@@ -88,8 +89,8 @@ fn query_count<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdRes
 
     let page = 0u32;
     let page_size = 2u32;
-    let tx_history: TransactionHistory =
-        transaction_history_query(&deps.querier, address, key, Some(page), page_size, block_size, callback_code_hash, contract_addr)?;
+    let tx_history: TransferHistory =
+        transfer_history_query(&deps.querier, address, key, Some(page), page_size, block_size, callback_code_hash, contract_addr)?;
 
     let id_to_find = 2;
     let specific_tx = tx_history.txs.iter().find(|&x| x.id == id_to_find);
