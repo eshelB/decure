@@ -2,10 +2,11 @@ use cosmwasm_std::{
     debug_print, to_binary, Api, Binary, Env, Extern, HandleResponse, HumanAddr, InitResponse,
     Querier, StdError, StdResult, Storage, Uint128,
 };
+use cosmwasm_std_regular::Storage as Cstorage;
 use secret_toolkit::snip20::{transfer_history_query, TransferHistory};
 
 use crate::msg::{CountResponse, HandleAnswer, HandleMsg, InitMsg, QueryMsg};
-use crate::state::{create_business, initialize_businesses, Business};
+use crate::state::{create_business, Business};
 
 // constants:
 const MAX_DESCRIPTION_LENGTH: u8 = 40;
@@ -20,12 +21,12 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     _msg: InitMsg,
 ) -> StdResult<InitResponse> {
     debug_print!("Contract was initialized by {}", env.message.sender);
-    initialize_businesses(&mut deps.storage);
+    // initialize_businesses(&mut deps.storage);
 
     Ok(InitResponse::default())
 }
 
-pub fn handle<S: Storage, A: Api, Q: Querier>(
+pub fn handle<S: Storage + Cstorage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     msg: HandleMsg,
@@ -45,7 +46,7 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     })
 }
 
-fn register_business<S: Storage, A: Api, Q: Querier>(
+fn register_business<S: Storage + Cstorage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     _env: Env,
     name: String,

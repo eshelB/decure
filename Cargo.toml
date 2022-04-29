@@ -38,7 +38,9 @@ snafu = { version = "0.6.3" }
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 schemars = "0.7"
 cosmwasm-std = { version = "0.10", package = "secret-cosmwasm-std" }
+cosmwasm-std-regular = { version = "0.16.7", package = "cosmwasm-std" }
 cosmwasm-storage = { version = "0.10", package = "secret-cosmwasm-storage" }
+cw-storage-plus = "0.13.2"
 secret-toolkit = "0.2.0" # Uncomment this for extra tools
 
 [dev-dependencies]
