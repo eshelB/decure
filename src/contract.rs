@@ -1,11 +1,11 @@
 use cosmwasm_std::{
     debug_print, to_binary, Api, Binary, Env, Extern, HandleResponse, HumanAddr, InitResponse,
-    Querier, StdError, StdResult, Storage,
+    Querier, StdError, StdResult, Storage, Uint128,
 };
 use secret_toolkit::snip20::{transfer_history_query, TransferHistory};
 
 use crate::msg::{CountResponse, HandleAnswer, HandleMsg, InitMsg, QueryMsg};
-use crate::state::{config, State};
+use crate::state::{create_business, initialize_businesses, Business};
 
 // constants:
 const MAX_DESCRIPTION_LENGTH: u8 = 40;
@@ -17,16 +17,10 @@ const MAX_NAME_LENGTH: u8 = 20;
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
-    msg: InitMsg,
+    _msg: InitMsg,
 ) -> StdResult<InitResponse> {
-    let state = State {
-        count: msg.count,
-        owner: deps.api.canonical_address(&env.message.sender)?,
-    };
-
-    config(&mut deps.storage).save(&state)?;
-
     debug_print!("Contract was initialized by {}", env.message.sender);
+    initialize_businesses(&mut deps.storage);
 
     Ok(InitResponse::default())
 }
@@ -75,40 +69,19 @@ fn register_business<S: Storage, A: Api, Q: Querier>(
     // check that a correctly formatted address was given
     deps.api.canonical_address(&address)?;
 
+    let new_business = Business {
+        name,
+        description,
+        average_rating: 0,
+        reviews_count: 0,
+        total_weight: Uint128(0),
+    };
+
+    create_business(&mut deps.storage, new_business, address)?;
+
     Ok(HandleAnswer::RegisterBusiness {
         status: "successfully called register business".to_string(),
     })
-}
-
-pub fn try_increment<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
-    _env: Env,
-) -> StdResult<HandleResponse> {
-    config(&mut deps.storage).update(|mut state| {
-        state.count += 1;
-        debug_print!("count = {}", state.count);
-        Ok(state)
-    })?;
-
-    debug_print("count incremented successfully");
-    Ok(HandleResponse::default())
-}
-
-pub fn try_reset<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
-    env: Env,
-    count: i32,
-) -> StdResult<HandleResponse> {
-    let sender_address_raw = deps.api.canonical_address(&env.message.sender)?;
-    config(&mut deps.storage).update(|mut state| {
-        if sender_address_raw != state.owner {
-            return Err(StdError::Unauthorized { backtrace: None });
-        }
-        state.count = count;
-        Ok(state)
-    })?;
-    debug_print("count reset successfully");
-    Ok(HandleResponse::default())
 }
 
 pub fn query<S: Storage, A: Api, Q: Querier>(
@@ -166,6 +139,7 @@ fn query_count<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdRes
 
 #[cfg(test)]
 mod tests {
+    use crate::state::get_business_by_address;
     use cosmwasm_std::testing::{mock_dependencies, mock_env};
     use cosmwasm_std::{coins, from_binary};
 
@@ -203,6 +177,20 @@ mod tests {
                 println!("success")
             }
         }
+
+        // check that the business was indeed saved
+        let saved = get_business_by_address(&deps.storage, &HumanAddr("mock-address".to_string()));
+
+        assert_eq!(
+            saved.unwrap().unwrap(),
+            Business {
+                name: "Starbucks".to_string(),
+                description: "a place to eat".to_string(),
+                average_rating: 0,
+                reviews_count: 0,
+                total_weight: Uint128(0)
+            }
+        )
     }
 
     #[test]
