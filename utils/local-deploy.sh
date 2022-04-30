@@ -145,7 +145,7 @@ function data_of() {
 }
 
 function get_generic_err() {
-    jq -r '.output_error.generic_err.msg' <<<"$1"
+    jq -r '.output_error.generic_err.msg' <<< "$1"
 }
 
 # Send a compute transaction and return the tx hash.
@@ -301,9 +301,8 @@ function test_register_business() {
     local contract_addr="$1"
 
     log_test_header
-    expected_error="Error: this is the expected error"
 
-    register_business_message='{"register_business":{"name":"Starbucks","description":"a place to eat","address":"address"}}'
+    register_business_message='{"register_business":{"name":"Starbucks","description":"a place to eat","address":"secret18vd8fpwxzck93qlwghaj6arh4p7c5n8978vsyg"}}'
     tx_hash="$(compute_execute "$contract_addr" "$register_business_message" --from a --gas 150000 -y)"
     register_business_result="$(data_of wait_for_compute_tx "$tx_hash" 'waiting for register_business from "a" to process')"
     log result "$register_business_result"
@@ -315,12 +314,31 @@ function test_register_business() {
     log "register business: SUCCESS!"
 }
 
+function test_register_existing_business() {
+    set -e
+    local contract_addr="$1"
+
+    log_test_header
+
+    register_business_message='{"register_business":{"name":"Starbucks-again","description":"doubled","address":"secret18vd8fpwxzck93qlwghaj6arh4p7c5n8978vsyg"}}'
+    tx_hash="$(compute_execute "$contract_addr" "$register_business_message" --from a --gas 150000 -y)"
+    local register_business_result
+    ! register_business_result="$(wait_for_compute_tx "$tx_hash" 'waiting for register_business')"
+
+    assert_eq \
+        "$(get_generic_err "$register_business_result")" \
+        "A business is already registered on that address"
+
+    assert_eq "$status" "successfully called register business"
+
+    log "register business: SUCCESS!"
+}
+
 function test_register_business_long_name() {
     set -e
     local contract_addr="$1"
 
     log_test_header
-    expected_error="Error: this is the expected error"
 
     register_business_message='{"register_business":{"name":"AVeryLongNameForABusinessIsNotAccepted","description":"a place to eat","address":"address"}}'
     tx_hash="$(compute_execute "$contract_addr" "$register_business_message" --from a --gas 150000 -y)"
@@ -338,7 +356,6 @@ function test_register_business_long_description() {
     local contract_addr="$1"
 
     log_test_header
-    expected_error="Error: this is the expected error"
 
     register_business_message='{"register_business":{"name":"shortName","description":"a place to eat with a very long description","address":"address"}}'
     tx_hash="$(compute_execute "$contract_addr" "$register_business_message" --from a --gas 150000 -y)"
@@ -349,163 +366,6 @@ function test_register_business_long_description() {
         "Description length can't be bigger than 40"
 
     log "register business long description: SUCCESS!"
-}
-
-function test_wrong_query_variant() {
-    set -e
-    local contract_addr="$1"
-
-    log_test_header
-    expected_error="Error: this is the expected error"
-
-    key=a
-    result="$(compute_query "$contract_addr" '{"get_count":{}}' 2>&1 || true )"
-    result_comparable=$(echo $result | sed 's/Usage:.*//' | awk '{$1=$1};1')
-
-    assert_eq "$result_comparable" "$expected_error"
-    log "wrong query variant: SUCCESS!"
-}
-
-function test_add() {
-    set -e
-    local contract_addr="$1"
-
-    log_test_header
-
-    local key="a"
-    local tx_hash
-
-    log "adding..."
-    local add_message='{"add": ["23", "3"]}'
-    tx_hash="$(compute_execute "$contract_addr" "$add_message" "--from" "$key" --gas "150000" "-y")"
-    echo "$tx_hash"
-
-    local add_response
-    add_response="$(data_of wait_for_compute_tx "$tx_hash" "waiting for add to \"$key\" to process")"
-    log "$add_response"
-
-    local expected_response
-    expected_response='"26"'
-    assert_eq "$add_response" "$expected_response"
-}
-
-function test_sub() {
-    set -e
-    local contract_addr="$1"
-
-    log_test_header
-
-    local key="a"
-    local tx_hash
-
-    log "subtracting..."
-    local sub_message='{"sub": ["23", "3"]}'
-    tx_hash="$(compute_execute "$contract_addr" "$sub_message" "--from" "$key"  --gas "150000" "-y")"
-    echo "$tx_hash"
-
-    local sub_response
-    sub_response="$(data_of wait_for_compute_tx "$tx_hash" "waiting for sub from \"$key\" to process")"
-    log "$sub_response"
-
-    local expected_response
-    expected_response='"20"'
-    assert_eq "$sub_response" "$expected_response"
-}
-
-function test_mul() {
-    set -e
-    local contract_addr="$1"
-
-    log_test_header
-
-    local key="a"
-    local tx_hash
-
-    log "multiplying..."
-    local mul_message='{"mul": ["23", "3"]}'
-    tx_hash="$(compute_execute "$contract_addr" "$mul_message" "--from" "$key" --gas "150000" "-y")"
-    echo "$tx_hash"
-
-    local mul_response
-    mul_response="$(data_of wait_for_compute_tx "$tx_hash" "waiting for mul from \"$key\" to process")"
-    log "$mul_response"
-
-    local expected_response
-    expected_response='"69"'
-    assert_eq "$mul_response" "$expected_response"
-}
-
-function test_div() {
-    set -e
-    local contract_addr="$1"
-
-    log_test_header
-
-    local key="a"
-    local tx_hash
-
-    log "dividing..."
-    local div_message='{"div": ["23", "3"]}'
-    tx_hash="$(compute_execute "$contract_addr" "$div_message" "--from" "$key" --gas "150000" "-y")"
-    echo "$tx_hash"
-
-    local div_response
-    div_response="$(data_of wait_for_compute_tx "$tx_hash" "waiting for div from \"$key\" to process")"
-    log "$div_response"
-
-    local expected_response
-    expected_response='"7"'
-    assert_eq "$div_response" "$expected_response"
-}
-
-function test_div_by_zero() {
-    set -e
-    local contract_addr="$1"
-
-    log_test_header
-
-    local key="a"
-    local tx_hash
-
-    log "dividing..."
-    local div_message='{"div": ["23", "0"]}'
-
-    tx_hash="$(compute_execute "$contract_addr" "$div_message" "--from" "$key" --gas "150000" "-y")"
-    echo "$tx_hash"
-
-    local div_response
-    # Notice the `!` before the command - it is EXPECTED to fail.
-    ! div_response="$(wait_for_compute_tx "$tx_hash" "waiting division by zero result")"
-    local div_error
-    div_error="$(get_generic_err "$div_response")"
-
-    log "$div_error"
-
-    local expected_error="Divisor can't be zero"
-    assert_eq "$div_error" "$expected_error"
-}
-
-function test_sqrt() {
-    set -e
-    local contract_addr="$1"
-
-    log_test_header
-
-    local key="a"
-    local tx_hash
-
-    log "calculating square root..."
-    local sqrt_message='{"sqrt": "23"}'
-    tx_hash="$(compute_execute "$contract_addr" "$sqrt_message" "--from" "$key" --gas "150000" "-y")"
-    echo "$tx_hash"
-
-    local sqrt_response
-    sqrt_response="$(data_of wait_for_compute_tx "$tx_hash" "waiting for sqrt from \"$key\" to process")"
-    log "$sqrt_response"
-
-    local expected_response
-    expected_response='"4"'
-    assert_eq "$sqrt_response" "$expected_response"
 }
 
 function main() {
@@ -544,9 +404,11 @@ function main() {
     dir="code"
     contract_addr="$(create_contract "$dir" "$init_msg")"
 
-    # test_register_business "$contract_addr"
+    test_register_business "$contract_addr"
+    test_register_existing_business "$contract_addr"
     # test_register_business_long_name "$contract_addr"
-    test_register_business_long_description "$contract_addr"
+    # test_register_business_long_description "$contract_addr"
+    # test_register_business_long_description "$contract_addr"
 
     log 'deploy + test completed successfully'
 

@@ -1,8 +1,7 @@
 use cosmwasm_std::{
-    debug_print, to_binary, Api, Binary, Env, Extern, HandleResponse, HumanAddr, InitResponse,
-    Querier, StdError, StdResult, Storage, Uint128,
+    to_binary, Api, Binary, Env, Extern, HandleResponse, HumanAddr, InitResponse, Querier,
+    StdError, StdResult, Storage, Uint128,
 };
-use cosmwasm_std_regular::Storage as Cstorage;
 use secret_toolkit::snip20::{transfer_history_query, TransferHistory};
 
 use crate::msg::{CountResponse, HandleAnswer, HandleMsg, InitMsg, QueryMsg};
@@ -16,17 +15,16 @@ const MAX_NAME_LENGTH: u8 = 20;
 // use secret_toolkit::snip20::{balance_query, Balance};
 
 pub fn init<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
-    env: Env,
+    _deps: &mut Extern<S, A, Q>,
+    _env: Env,
     _msg: InitMsg,
 ) -> StdResult<InitResponse> {
-    debug_print!("Contract was initialized by {}", env.message.sender);
     // initialize_businesses(&mut deps.storage);
 
     Ok(InitResponse::default())
 }
 
-pub fn handle<S: Storage + Cstorage, A: Api, Q: Querier>(
+pub fn handle<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     msg: HandleMsg,
@@ -36,7 +34,7 @@ pub fn handle<S: Storage + Cstorage, A: Api, Q: Querier>(
             name,
             address,
             description,
-        } => register_business(deps, env, name, address, description)?,
+        } => register_business(deps, env, name, HumanAddr(address.to_string()), description)?,
     };
 
     Ok(HandleResponse {
@@ -46,7 +44,7 @@ pub fn handle<S: Storage + Cstorage, A: Api, Q: Querier>(
     })
 }
 
-fn register_business<S: Storage + Cstorage, A: Api, Q: Querier>(
+fn register_business<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     _env: Env,
     name: String,
@@ -90,7 +88,9 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
     msg: QueryMsg,
 ) -> StdResult<Binary> {
     match msg {
-        QueryMsg::GetCount {} => to_binary(&query_count(deps)?),
+        QueryMsg::WithPermit { permit, query } => permit_queries(deps, permit, query),
+        // todo remove
+        // _ => Ok(Binary(vec![2u8])),
     }
 }
 
@@ -140,9 +140,11 @@ fn query_count<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> StdRes
 
 #[cfg(test)]
 mod tests {
-    use crate::state::get_business_by_address;
+    use crate::msg::QueryAnswer::Businesses;
+    use crate::state::{get_business_by_address, get_businesses_bucket};
     use cosmwasm_std::testing::{mock_dependencies, mock_env};
-    use cosmwasm_std::{coins, from_binary};
+    use cosmwasm_std::{coins, from_binary, Order, KV};
+    use cosmwasm_storage::bucket;
 
     use super::*;
 
@@ -191,7 +193,120 @@ mod tests {
                 reviews_count: 0,
                 total_weight: Uint128(0)
             }
-        )
+        );
+
+        // try range of businesses
+        // todo remove
+        let all_businesses = get_businesses_bucket(&deps.storage);
+        let vecbus: StdResult<Vec<KV<Business>>> =
+            all_businesses.range(None, None, Order::Ascending).collect();
+        assert_eq!(
+            vecbus.unwrap(),
+            vec!((
+                b"mock-address".to_vec(),
+                Business {
+                    name: "Starbucks".to_string(),
+                    description: "a place to eat".to_string(),
+                    average_rating: 0,
+                    reviews_count: 0,
+                    total_weight: Uint128(0)
+                }
+            ))
+        );
+
+        let mut all_businesses = bucket(b"businesses", &mut deps.storage);
+        all_businesses.save(
+            b"second",
+            &Business {
+                name: "second".to_string(),
+                description: "second".to_string(),
+                average_rating: 0,
+                reviews_count: 0,
+                total_weight: Default::default(),
+            },
+        );
+
+        all_businesses.save(
+            b"third",
+            &Business {
+                name: "third".to_string(),
+                description: "third".to_string(),
+                average_rating: 0,
+                reviews_count: 0,
+                total_weight: Default::default(),
+            },
+        );
+
+        all_businesses.save(
+            b"arthur",
+            &Business {
+                name: "arthur".to_string(),
+                description: "arthur the third".to_string(),
+                average_rating: 0,
+                reviews_count: 0,
+                total_weight: Default::default(),
+            },
+        );
+
+        let vecbus: StdResult<Vec<KV<Business>>> =
+            // all_businesses.range(None, None, Order::Ascending).collect();
+            // all_businesses.range(Some(b"secone"), None, Order::Ascending).collect();
+            all_businesses.range(None, None, Order::Ascending).collect();
+
+        println!("{:?}", vecbus);
+    }
+
+    #[test]
+    fn register_existing_business() {
+        let mut deps = mock_dependencies(20, &coins(2, "token"));
+
+        let msg = InitMsg { count: 17 };
+        let env = mock_env("creator", &coins(2, "token"));
+        let _res = init(&mut deps, env, msg).unwrap();
+
+        let env = mock_env("anyone", &coins(2, "token"));
+        let msg = HandleMsg::RegisterBusiness {
+            name: "Starbucks".to_string(),
+            description: "a place to eat".to_string(),
+            address: HumanAddr("mock-address".to_string()),
+        };
+        let res = handle(&mut deps, env, msg);
+        let res_unpacked = from_binary::<HandleAnswer>(&res.unwrap().data.unwrap()).unwrap();
+        match res_unpacked {
+            HandleAnswer::RegisterBusiness { status } => {
+                assert_eq!("successfully called register business", status);
+                println!("success")
+            }
+        }
+
+        // another business, should succeed
+        let env = mock_env("anyone", &coins(2, "token"));
+        let msg = HandleMsg::RegisterBusiness {
+            name: "Starbucks".to_string(),
+            description: "a place to eat".to_string(),
+            address: HumanAddr("another-address".to_string()),
+        };
+        let res = handle(&mut deps, env, msg);
+        let res_unpacked = from_binary::<HandleAnswer>(&res.unwrap().data.unwrap()).unwrap();
+        match res_unpacked {
+            HandleAnswer::RegisterBusiness { status } => {
+                assert_eq!("successfully called register business", status);
+                println!("success")
+            }
+        }
+
+        // again, should fail
+        let env = mock_env("anyone", &coins(2, "token"));
+        let msg = HandleMsg::RegisterBusiness {
+            name: "Starbucks".to_string(),
+            description: "a place to eat".to_string(),
+            address: HumanAddr("mock-address".to_string()),
+        };
+        let res = handle(&mut deps, env, msg).unwrap_err();
+        assert_eq!(
+            res,
+            StdError::generic_err("A business is already registered on that address")
+        );
     }
 
     #[test]
