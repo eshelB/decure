@@ -14,14 +14,14 @@ use crate::utils::recalculate_weighted_average;
 // constants:
 const MAX_DESCRIPTION_LENGTH: u8 = 40;
 const MAX_NAME_LENGTH: u8 = 20;
+const MIN_RATING: u8 = 0;
+const MAX_RATING: u8 = 5;
 
 pub fn init<S: Storage, A: Api, Q: Querier>(
     _deps: &mut Extern<S, A, Q>,
     _env: Env,
     _msg: InitMsg,
 ) -> StdResult<InitResponse> {
-    // initialize_businesses(&mut deps.storage);
-
     Ok(InitResponse::default())
 }
 
@@ -76,6 +76,12 @@ fn review_business<S: Storage, A: Api, Q: Querier>(
     tx_page: u32,
     viewing_key: String,
 ) -> StdResult<HandleAnswer> {
+    if rating < MIN_RATING || rating > MAX_RATING {
+        return Err(StdError::generic_err(
+            "ratings must be between 0 and 5 stars",
+        ));
+    }
+
     let mut status;
 
     let existing_business =
@@ -267,7 +273,6 @@ pub fn query_reviews<S: Storage>(
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env};
     use cosmwasm_std::{coins, from_binary};
-    use cosmwasm_storage::bucket;
     use secret_toolkit::incubator::CashMap;
 
     use crate::msg::DisplayedReview;
@@ -279,7 +284,7 @@ mod tests {
     fn register_business() -> StdResult<()> {
         let mut deps = mock_dependencies(20, &coins(2, "token"));
 
-        let msg = InitMsg { count: 17 };
+        let msg = InitMsg {};
         let env = mock_env("creator", &coins(2, "token"));
         let _res = init(&mut deps, env, msg).unwrap();
 
@@ -411,7 +416,7 @@ mod tests {
     fn register_existing_business() {
         let mut deps = mock_dependencies(20, &coins(2, "token"));
 
-        let msg = InitMsg { count: 17 };
+        let msg = InitMsg {};
         let env = mock_env("creator", &coins(2, "token"));
         let _res = init(&mut deps, env, msg).unwrap();
 
@@ -466,7 +471,7 @@ mod tests {
     fn review_unregistered_business() -> StdResult<()> {
         let mut deps = mock_dependencies(20, &coins(2, "token"));
 
-        let msg = InitMsg { count: 17 };
+        let msg = InitMsg {};
         let env = mock_env("creator", &coins(2, "token"));
         let _res = init(&mut deps, env, msg).unwrap();
 
@@ -498,10 +503,50 @@ mod tests {
     }
 
     #[test]
+    fn review_rating_out_of_bounds() -> StdResult<()> {
+        let mut deps = mock_dependencies(20, &coins(2, "token"));
+
+        let msg = InitMsg {};
+        let env = mock_env("creator", &coins(2, "token"));
+        init(&mut deps, env, msg).unwrap();
+
+        let env = mock_env("anyone", &coins(2, "token"));
+        let msg = HandleMsg::RegisterBusiness {
+            name: "Starbucks".to_string(),
+            description: "a place to eat".to_string(),
+            address: HumanAddr("mock-address".to_string()),
+        };
+        handle(&mut deps, env, msg)?;
+
+        // 1st review
+        let env = mock_env("anyone", &coins(2, "token"));
+        let msg = HandleMsg::ReviewBusiness {
+            address: HumanAddr("mock-address".to_string()),
+            content: "very enjoyable time at this place".to_string(),
+            rating: 6,
+            title: "Fantastic!".to_string(),
+            tx_id: 0,
+            tx_page: 0,
+            viewing_key: "vk".to_string(),
+        };
+
+        let res = handle(&mut deps, env, msg);
+        let error = res.unwrap_err();
+
+        if let StdError::GenericErr { msg, .. } = error {
+            assert_eq!("ratings must be between 0 and 5 stars", msg);
+        } else {
+            panic!("there should be a generic error here");
+        }
+
+        Ok(())
+    }
+
+    #[test]
     fn review() -> StdResult<()> {
         let mut deps = mock_dependencies(20, &coins(2, "token"));
 
-        let msg = InitMsg { count: 17 };
+        let msg = InitMsg {};
         let env = mock_env("creator", &coins(2, "token"));
         init(&mut deps, env, msg).unwrap();
 
@@ -686,7 +731,7 @@ mod tests {
     fn register_business_long_name() {
         let mut deps = mock_dependencies(20, &coins(2, "token"));
 
-        let msg = InitMsg { count: 17 };
+        let msg = InitMsg {};
         let env = mock_env("creator", &coins(2, "token"));
         let _res = init(&mut deps, env, msg).unwrap();
 
@@ -711,7 +756,7 @@ mod tests {
     fn register_business_long_description() {
         let mut deps = mock_dependencies(20, &coins(2, "token"));
 
-        let msg = InitMsg { count: 17 };
+        let msg = InitMsg {};
         let env = mock_env("creator", &coins(2, "token"));
         let _res = init(&mut deps, env, msg).unwrap();
 

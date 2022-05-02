@@ -1,5 +1,4 @@
 use cosmwasm_std::{HumanAddr, ReadonlyStorage, StdError, StdResult, Storage, Uint128};
-use cosmwasm_std::{Order, KV};
 use schemars::JsonSchema;
 use secret_toolkit::incubator::{CashMap, ReadOnlyCashMap};
 use serde::{Deserialize, Serialize};
@@ -58,7 +57,7 @@ pub fn apply_review_on_business<S: Storage>(
             //todo unite casting types
             b.total_weight = Uint128::from(new_total_weight as u128);
             b.reviews_count += is_new as u32;
-            all_businesses.insert(business_address.as_str().as_bytes(), b);
+            all_businesses.insert(business_address.as_str().as_bytes(), b)?;
             Ok(())
         }
         None => Err(StdError::generic_err(

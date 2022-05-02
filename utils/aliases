@@ -1,0 +1,4 @@
+alias bal_a='secretd q snip20 balance secret18vd8fpwxzck93qlwghaj6arh4p7c5n8978vsyg secret1ap26qrlp8mcq2pg6r47w43l0y8zkqm8a450s03 vk'
+alias bal_b='secretd q snip20 balance secret18vd8fpwxzck93qlwghaj6arh4p7c5n8978vsyg secret1fc3fzy78ttp0lwuujw7e52rhspxn8uj52zfyne vk'
+alias bal_c='secretd q snip20 balance secret18vd8fpwxzck93qlwghaj6arh4p7c5n8978vsyg secret1ajz54hz8azwuy34qwy9fkjnfcrvf0dzswy0lqq vk'
+alias bal_d='secretd q snip20 balance secret18vd8fpwxzck93qlwghaj6arh4p7c5n8978vsyg secret1ldjxljw7v4vk6zhyduywh04hpj0jdwxsmrlatf vk'

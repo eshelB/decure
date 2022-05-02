@@ -5,9 +5,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
-pub struct InitMsg {
-    pub count: i32,
-}
+pub struct InitMsg {}
 
 #[derive(Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]

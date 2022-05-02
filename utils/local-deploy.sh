@@ -222,7 +222,7 @@ function create_contract() {
     fi
 
     log debug3
-    log init result "$init_result"
+    # log init result "$init_result"
     result=$(jq -r '.logs[0].events[0].attributes[] | select(.key == "contract_address") | .value' <<<"$init_result")
     log debug4
 
@@ -303,10 +303,12 @@ function test_query() {
 function test_register_business() {
     set -e
     local contract_addr="$1"
+    local business_addr="$2"
 
     log_test_header
 
-    register_business_message='{"register_business":{"name":"Starbucks","description":"a place to eat","address":"secret18vd8fpwxzck93qlwghaj6arh4p7c5n8978vsyg"}}'
+    register_business_message='{"register_business":{"name":"Starbucks","description":"a place to eat","address":"'"$business_addr"'"}}'
+    log "message: $register_business_message"
     tx_hash="$(compute_execute "$contract_addr" "$register_business_message" --from a --gas 150000 -y)"
     register_business_result="$(data_of wait_for_compute_tx "$tx_hash" 'waiting for register_business from "a" to process')"
     log result "$register_business_result"
@@ -321,10 +323,12 @@ function test_register_business() {
 function test_register_existing_business() {
     set -e
     local contract_addr="$1"
+    local business_addr="$2"
 
     log_test_header
 
-    register_business_message='{"register_business":{"name":"Starbucks-again","description":"doubled","address":"secret18vd8fpwxzck93qlwghaj6arh4p7c5n8978vsyg"}}'
+    register_business_message='{"register_business":{"name":"Starbucks","description":"a place to eat","address":"'"$business_addr"'"}}'
+    log "message: $register_business_message"
     tx_hash="$(compute_execute "$contract_addr" "$register_business_message" --from a --gas 150000 -y)"
     local register_business_result
     ! register_business_result="$(wait_for_compute_tx "$tx_hash" 'waiting for register_business')"
@@ -335,7 +339,50 @@ function test_register_existing_business() {
 
     assert_eq "$status" "successfully called register business"
 
-    log "register business: SUCCESS!"
+    log "register existing business: SUCCESS!"
+}
+
+function test_review () {
+    set -e
+    local contract_addr="$1"
+    local business_addr="$2"
+
+    log_test_header
+
+    local review_message
+    review_message='{
+      "review_business": {
+        "address":"'"$business_addr"'",
+        "content":"great stuff!",
+        "rating":5,
+        "title":"amazing restaurant",
+        "tx_id": 2,
+        "tx_page": 0,
+        "viewing_key": "vk"
+      }
+    }'
+
+    tx_hash="$(compute_execute "$contract_addr" "$review_message" --from a --gas 150000 -y)"
+    review_business_result="$(data_of wait_for_compute_tx "$tx_hash" 'waiting for register_business from "a" to process')"
+    log result "$review_business_result"
+    local status
+    status=$(jq -er '.review_business.status' <<< "$review_business_result")
+
+    assert_eq "$status" "Successfully added a new review on business, receipt was accounted for"
+    log "review business: SUCCESS!"
+
+    local query_single_business_message
+    query_single_business_message='{
+      "get_single_business": {
+        "address":"'"$business_addr"'"
+      }
+    }'
+
+    result="$(compute_query "$contract_addr" "$query_single_business_message" 2>&1 || true )"
+    result_comparable=$(echo $result | sed 's/ Usage:.*//')
+    assert_eq "$result_comparable" 'expected OUTPUT'
+
+    log "query single business: SUCCESS!"
 }
 
 function test_register_business_long_name() {
@@ -408,8 +455,12 @@ function main() {
     dir="code"
     contract_addr="$(create_contract "$dir" "$init_msg")"
 
-    test_register_business "$contract_addr"
-    test_register_existing_business "$contract_addr"
+    local business_address
+    business_address="secret1fc3fzy78ttp0lwuujw7e52rhspxn8uj52zfyne"
+
+    test_register_business "$contract_addr" "$business_address"
+    # test_register_existing_business "$contract_addr" "$business_address"
+    test_review "$contract_addr" "$business_address"
     # test_register_business_long_name "$contract_addr"
     # test_register_business_long_description "$contract_addr"
     # test_register_business_long_description "$contract_addr"
