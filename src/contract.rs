@@ -109,7 +109,7 @@ fn review_business<S: Storage, A: Api, Q: Querier>(
 
         println!("{}", tx_page);
         base_review.weight = Uint128::from(base_review.weight.u128() + new_weight_from_tx);
-        base_review.tx_ids.push(1);
+        base_review.tx_ids.push(tx_id);
     } else {
         status.push_str(", specified receipt was already used");
     }
@@ -628,7 +628,7 @@ mod tests {
         };
         handle(&mut deps, env, msg)?;
 
-        // 4th review - This one should only update the first review, since it's the same sender
+        // 4th review - This one re-applies the first transaction, should not update the weight
         let env = mock_env("anyone", &coins(2, "token"));
         let msg = HandleMsg::ReviewBusiness {
             address: HumanAddr("mock-address".to_string()),
@@ -636,6 +636,30 @@ mod tests {
             rating: 4,
             title: "Fantastic-4!".to_string(),
             tx_id: 0,
+            tx_page: 0,
+        };
+        let res = handle(&mut deps, env, msg)?;
+
+        let res_unpacked = from_binary::<HandleAnswer>(&res.unwrap().data.unwrap()).unwrap();
+        match res_unpacked {
+            HandleAnswer::ReviewBusiness { status } => {
+                assert_eq!(
+                    "Successfully added a new review on business, receipt was accounted for",
+                    status
+                );
+                println!("success")
+            }
+            _ => panic!("got wrong answer variant"),
+        }
+
+        // 5th review - This one should only update the first review, since it's the same sender
+        let env = mock_env("anyone", &coins(2, "token"));
+        let msg = HandleMsg::ReviewBusiness {
+            address: HumanAddr("mock-address".to_string()),
+            content: "changed my mind, 4 instead of 5".to_string(),
+            rating: 4,
+            title: "Fantastic-4!".to_string(),
+            tx_id: 1,
             tx_page: 0,
         };
         handle(&mut deps, env, msg)?;
