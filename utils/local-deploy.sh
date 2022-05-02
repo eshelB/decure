@@ -380,8 +380,49 @@ function test_review () {
 
     result="$(compute_query "$contract_addr" "$query_single_business_message" 2>&1 || true )"
     result_comparable=$(echo $result | sed 's/ Usage:.*//')
-    assert_eq "$result_comparable" 'expected OUTPUT'
+    assert_eq "$result_comparable" '{"single_business":{"business":{"name":"Starbucks","description":"a place to eat","address":"secret1fc3fzy78ttp0lwuujw7e52rhspxn8uj52zfyne","average_rating":5000,"reviews_count":1},"status":"Successfully retrieved business by address"}}'
+    local rating
+    rating="$(jq -er '.single_business.business.average_rating' <<< "$result_comparable")"
+    log "rating after a rated: $rating"
+    assert_eq $rating '5000'
+    log "query single business: SUCCESS!"
 
+    local review_message
+    review_message='{
+      "review_business": {
+        "address":"'"$business_addr"'",
+        "content":"Not so good",
+        "rating":0,
+        "title":"better going somewhere else",
+        "tx_id": 5,
+        "tx_page": 0,
+        "viewing_key": "vk"
+      }
+    }'
+
+    tx_hash="$(compute_execute "$contract_addr" "$review_message" --from c --gas 150000 -y)"
+    review_business_result="$(data_of wait_for_compute_tx "$tx_hash" 'waiting for register_business from "c" to process')"
+    log result "$review_business_result"
+    local status
+    status=$(jq -er '.review_business.status' <<< "$review_business_result")
+
+    assert_eq "$status" "Successfully added a new review on business, receipt was accounted for"
+    log "review business from c: SUCCESS!"
+
+    local query_single_business_message
+    query_single_business_message='{
+      "get_single_business": {
+        "address":"'"$business_addr"'"
+      }
+    }'
+
+    result="$(compute_query "$contract_addr" "$query_single_business_message" 2>&1 || true )"
+    result_comparable=$(echo $result | sed 's/ Usage:.*//')
+    assert_eq "$result_comparable" '{"single_business":{"business":{"name":"Starbucks","description":"a place to eat","address":"secret1fc3fzy78ttp0lwuujw7e52rhspxn8uj52zfyne","average_rating":5000,"reviews_count":1},"status":"Successfully retrieved business by address"}}'
+    local rating
+    rating="$(jq -er '.single_business.business.average_rating' <<< "$result_comparable")"
+    log "rating after c rated: $rating"
+    assert_eq $rating '1666'
     log "query single business: SUCCESS!"
 }
 
@@ -451,7 +492,7 @@ function main() {
     log "copied contract wasm to container"
 
     local init_msg
-    init_msg='{"count": 0}'
+    init_msg='{}'
     dir="code"
     contract_addr="$(create_contract "$dir" "$init_msg")"
 
