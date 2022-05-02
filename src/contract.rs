@@ -570,14 +570,15 @@ mod tests {
             description: "a place to eat".to_string(),
             address: HumanAddr("mock-address".to_string()),
         };
-        handle(&mut deps, env, msg);
+        handle(&mut deps, env, msg)?;
+
         let env = mock_env("anyone", &coins(2, "token"));
         let msg = HandleMsg::RegisterBusiness {
             name: "Starbucks".to_string(),
             description: "a place to eat".to_string(),
             address: HumanAddr("another-address".to_string()),
         };
-        handle(&mut deps, env, msg);
+        handle(&mut deps, env, msg)?;
 
         // 1st review
         let env = mock_env("anyone", &coins(2, "token"));
