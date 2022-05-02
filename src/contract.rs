@@ -640,13 +640,10 @@ mod tests {
         };
         let res = handle(&mut deps, env, msg)?;
 
-        let res_unpacked = from_binary::<HandleAnswer>(&res.unwrap().data.unwrap()).unwrap();
+        let res_unpacked = from_binary::<HandleAnswer>(&res.data.unwrap())?;
         match res_unpacked {
             HandleAnswer::ReviewBusiness { status } => {
-                assert_eq!(
-                    "Successfully added a new review on business, receipt was accounted for",
-                    status
-                );
+                assert_eq!("Successfully updated a previous review on business, specified receipt was already used", status);
                 println!("success")
             }
             _ => panic!("got wrong answer variant"),
@@ -662,7 +659,18 @@ mod tests {
             tx_id: 1,
             tx_page: 0,
         };
-        handle(&mut deps, env, msg)?;
+        let res = handle(&mut deps, env, msg)?;
+        let res_unpacked = from_binary::<HandleAnswer>(&res.data.unwrap())?;
+        match res_unpacked {
+            HandleAnswer::ReviewBusiness { status } => {
+                assert_eq!(
+                    "Successfully updated a previous review on business, receipt was accounted for",
+                    status
+                );
+                println!("success")
+            }
+            _ => panic!("got wrong answer variant"),
+        }
 
         let msg = QueryMsg::GetReviewsOnBusiness {
             business_address: HumanAddr("mock-address".to_string()),
