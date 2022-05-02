@@ -3,11 +3,12 @@ use cosmwasm_std::{
     QueryResult, StdError, StdResult, Storage, Uint128,
 };
 
-use crate::msg::{HandleAnswer, HandleMsg, InitMsg, QueryAnswer, QueryMsg};
+use crate::msg::{DisplayedBusiness, HandleAnswer, HandleMsg, InitMsg, QueryAnswer, QueryMsg};
 use crate::state::{
-    create_business, create_review, get_businesses_page, get_reviews_on_business, may_load_review,
-    Business, Review,
+    apply_review_on_business, create_business, create_review, get_business_by_address,
+    get_businesses_page, get_reviews_on_business, may_load_review, Business, Review,
 };
+use crate::utils::recalculate_weighted_average;
 
 // todo use
 // use secret_toolkit::snip20::{transfer_history_query, TransferHistory};
@@ -70,10 +71,17 @@ fn review_business<S: Storage, A: Api, Q: Querier>(
 ) -> StdResult<HandleAnswer> {
     let mut status;
 
+    let existing_business =
+        get_business_by_address(&deps.storage, &address)?.ok_or(StdError::generic_err(
+            "There is no business registered on that address. You can register it instead.",
+        ))?;
+
     let previous_review = may_load_review(&deps.storage, &address, &env.message.sender)?;
 
+    let mut increment_count: u8 = 0;
     if previous_review.is_none() {
         status = "Successfully added a new review on business".to_string();
+        increment_count = 1;
     } else {
         status = "Successfully updated a previous review on business".to_string()
     }
@@ -90,16 +98,18 @@ fn review_business<S: Storage, A: Api, Q: Querier>(
     });
 
     let previous_weight = base_review.weight.u128();
-    let mut new_reviews = 0;
+    let previous_rating = base_review.rating;
 
+    let mut new_weight_from_tx = 0;
     if !base_review.tx_ids.contains(&tx_id) {
         status.push_str(", receipt was accounted for");
 
         // todo query the snip-20, if fails - no update
+        new_weight_from_tx = 20;
+
         println!("{}", tx_page);
-        base_review.weight = Uint128::from(base_review.weight.u128() + 1);
+        base_review.weight = Uint128::from(base_review.weight.u128() + new_weight_from_tx);
         base_review.tx_ids.push(1);
-        new_reviews = 1;
     } else {
         status.push_str(", specified receipt was already used");
     }
@@ -115,8 +125,24 @@ fn review_business<S: Storage, A: Api, Q: Querier>(
         base_review,
     )?;
 
-    // todo update business sum with new_reviews, weight
-    println!("{}{}", previous_weight, new_reviews);
+    let (new_average, new_weight) = recalculate_weighted_average(
+        new_weight_from_tx,
+        previous_weight,
+        // todo verify casting
+        rating as u128,
+        previous_rating as u128,
+        existing_business.total_weight.u128(),
+        existing_business.average_rating as u128,
+    )?;
+
+    apply_review_on_business(
+        &mut deps.storage,
+        address,
+        // todo verify casting
+        new_weight as u32,
+        new_average as u32,
+        increment_count,
+    )?;
 
     Ok(HandleAnswer::ReviewBusiness { status })
 }
@@ -168,6 +194,7 @@ pub fn query<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>, msg: QueryM
             end,
             page_size,
         } => query_businesses(&deps.storage, start, end, page_size),
+        QueryMsg::GetSingleBusiness { address } => query_business(&deps.storage, address),
         QueryMsg::GetReviewsOnBusiness {
             business_address,
             start,
@@ -191,6 +218,26 @@ pub fn query_businesses<S: Storage>(
     to_binary(&QueryAnswer::Businesses {
         businesses: businesses_in_range,
         total,
+    })
+}
+
+pub fn query_business<S: Storage>(store: &S, address: HumanAddr) -> StdResult<Binary> {
+    let business = get_business_by_address(store, &address)?;
+
+    let status = match business {
+        None => "No business is registered on that address".to_string(),
+        Some(..) => "Successfully retrieved business by address".to_string(),
+    };
+
+    to_binary(&QueryAnswer::SingleBusiness {
+        business: business.map(|b| DisplayedBusiness {
+            name: b.name,
+            description: b.description,
+            address: b.address,
+            average_rating: b.average_rating,
+            reviews_count: b.reviews_count,
+        }),
+        status,
     })
 }
 
@@ -260,11 +307,11 @@ pub fn query_reviews<S: Storage>(
 
 #[cfg(test)]
 mod tests {
-    use crate::msg::DisplayedReview;
     use cosmwasm_std::testing::{mock_dependencies, mock_env};
     use cosmwasm_std::{coins, from_binary, Order, KV};
     use cosmwasm_storage::bucket;
 
+    use crate::msg::DisplayedReview;
     use crate::state::{get_business_by_address, get_businesses_bucket};
 
     use super::*;
@@ -476,12 +523,61 @@ mod tests {
     }
 
     #[test]
-    fn review() -> StdResult<()> {
+    fn review_unregistered_business() -> StdResult<()> {
         let mut deps = mock_dependencies(20, &coins(2, "token"));
 
         let msg = InitMsg { count: 17 };
         let env = mock_env("creator", &coins(2, "token"));
         let _res = init(&mut deps, env, msg).unwrap();
+
+        let env = mock_env("anyone", &coins(2, "token"));
+        let msg = HandleMsg::ReviewBusiness {
+            address: HumanAddr("mock-address".to_string()),
+            content: "very enjoyable time at this place".to_string(),
+            rating: 5,
+            title: "Fantastic!".to_string(),
+            tx_id: 0,
+            tx_page: 0,
+        };
+
+        let res = handle(&mut deps, env, msg);
+
+        let error = res.unwrap_err();
+
+        if let StdError::GenericErr { msg, .. } = error {
+            assert_eq!(
+                "There is no business registered on that address. You can register it instead.",
+                msg
+            )
+        } else {
+            panic!("there should be a generic error here")
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn review() -> StdResult<()> {
+        let mut deps = mock_dependencies(20, &coins(2, "token"));
+
+        let msg = InitMsg { count: 17 };
+        let env = mock_env("creator", &coins(2, "token"));
+        init(&mut deps, env, msg).unwrap();
+
+        let env = mock_env("anyone", &coins(2, "token"));
+        let msg = HandleMsg::RegisterBusiness {
+            name: "Starbucks".to_string(),
+            description: "a place to eat".to_string(),
+            address: HumanAddr("mock-address".to_string()),
+        };
+        handle(&mut deps, env, msg);
+        let env = mock_env("anyone", &coins(2, "token"));
+        let msg = HandleMsg::RegisterBusiness {
+            name: "Starbucks".to_string(),
+            description: "a place to eat".to_string(),
+            address: HumanAddr("another-address".to_string()),
+        };
+        handle(&mut deps, env, msg);
 
         // 1st review
         let env = mock_env("anyone", &coins(2, "token"));
@@ -581,6 +677,28 @@ mod tests {
                 println!("success")
             }
             _ => panic!("wrong query variant"),
+        }
+
+        let msg = QueryMsg::GetSingleBusiness {
+            address: HumanAddr("mock-address".to_string()),
+        };
+        let res = query(&deps, msg);
+        let res_unpacked: QueryAnswer = from_binary(&res.unwrap()).unwrap();
+        match res_unpacked {
+            QueryAnswer::SingleBusiness { business, status } => {
+                assert_eq!(
+                    business.unwrap(),
+                    DisplayedBusiness {
+                        name: "Starbucks".to_string(),
+                        description: "a place to eat".to_string(),
+                        address: HumanAddr("mock-address".to_string()),
+                        average_rating: 3666, // the weight of 4-star reviews is twice the weight of 3-star reviews
+                        reviews_count: 2,
+                    }
+                );
+                assert_eq!(status, "Successfully retrieved business by address");
+            }
+            _ => panic!("wrong query variant returned"),
         }
 
         Ok(())

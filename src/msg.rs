@@ -42,6 +42,9 @@ pub enum QueryMsg {
         end: Option<String>,
         page_size: u8,
     },
+    GetSingleBusiness {
+        address: HumanAddr,
+    },
     GetReviewsOnBusiness {
         business_address: HumanAddr,
         start: Option<String>,
@@ -59,6 +62,16 @@ pub struct DisplayedReview {
     pub last_update_timestamp: Uint128,
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub struct DisplayedBusiness {
+    pub name: String,
+    pub description: String,
+    pub address: HumanAddr,
+    pub average_rating: u32, // max - 5000, min - 0
+    pub reviews_count: u32,
+}
+
 #[derive(Serialize, Clone, Debug, PartialEq, JsonSchema)]
 #[cfg_attr(test, derive(Deserialize))]
 #[serde(rename_all = "snake_case")]
@@ -66,6 +79,10 @@ pub enum QueryAnswer {
     Businesses {
         businesses: Vec<Business>,
         total: Uint128,
+    },
+    SingleBusiness {
+        business: Option<DisplayedBusiness>,
+        status: String,
     },
     Reviews {
         reviews: Vec<DisplayedReview>,

@@ -14,8 +14,8 @@ pub struct Business {
     pub name: String,
     pub description: String,
     pub address: HumanAddr,
-    pub average_rating: i32, // max - maxint, min - 0
-    pub reviews_count: i32,
+    pub average_rating: u32, // max - maxint, min - 0
+    pub reviews_count: u32,
 
     // todo - kept private (implement DisplayedBusiness)
     pub total_weight: Uint128,
@@ -41,6 +41,31 @@ pub fn create_business<S: Storage>(store: &mut S, business: Business) -> StdResu
             Ok(())
         }
     }
+}
+
+pub fn apply_review_on_business<S: Storage>(
+    store: &mut S,
+    business_address: HumanAddr,
+    new_total_weight: u32,
+    new_average_rating: u32,
+    is_new: u8,
+) -> StdResult<Business> {
+    let mut all_businesses = bucket(KEY_BUSINESSES, store);
+    all_businesses.update(
+        business_address.as_str().as_bytes(),
+        |business: Option<Business>| match business {
+            Some(mut b) => {
+                b.average_rating = new_average_rating;
+                //todo unite casting types
+                b.total_weight = Uint128::from(new_total_weight as u128);
+                b.reviews_count += is_new as u32;
+                Ok(b)
+            }
+            None => Err(StdError::generic_err(
+                "Critical failure updating existing business",
+            )),
+        },
+    )
 }
 
 // todo for testing purposes, remove in final version.
