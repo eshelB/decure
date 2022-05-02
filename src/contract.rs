@@ -4,21 +4,16 @@ use cosmwasm_std::{
 };
 
 use crate::msg::{DisplayedBusiness, HandleAnswer, HandleMsg, InitMsg, QueryAnswer, QueryMsg};
+use crate::snip_20_query::query_snip20_tx;
 use crate::state::{
     apply_review_on_business, create_business, create_review, get_business_by_address,
     get_businesses_page, get_reviews_on_business, may_load_review, Business, Review,
 };
 use crate::utils::recalculate_weighted_average;
 
-// todo use
-// use secret_toolkit::snip20::{transfer_history_query, TransferHistory};
-
 // constants:
 const MAX_DESCRIPTION_LENGTH: u8 = 40;
 const MAX_NAME_LENGTH: u8 = 20;
-
-// use secret_toolkit::snip20::{transaction_history_query, TransactionHistory};
-// use secret_toolkit::snip20::{balance_query, Balance};
 
 pub fn init<S: Storage, A: Api, Q: Querier>(
     _deps: &mut Extern<S, A, Q>,
@@ -49,7 +44,18 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             title,
             tx_id,
             tx_page,
-        } => review_business(deps, env, address, content, rating, title, tx_id, tx_page)?,
+            viewing_key,
+        } => review_business(
+            deps,
+            env,
+            address,
+            content,
+            rating,
+            title,
+            tx_id,
+            tx_page,
+            viewing_key,
+        )?,
     };
 
     Ok(HandleResponse {
@@ -67,7 +73,7 @@ fn review_business<S: Storage, A: Api, Q: Querier>(
     rating: u8,
     title: String,
     tx_id: u64,
-    tx_page: u64,
+    tx_page: u32,
     viewing_key: String,
 ) -> StdResult<HandleAnswer> {
     let mut status;
@@ -105,10 +111,17 @@ fn review_business<S: Storage, A: Api, Q: Querier>(
     if !base_review.tx_ids.contains(&tx_id) {
         status.push_str(", receipt was accounted for");
 
-        query_snip_20_tx(tx_id, viewing_key, tx_page);
+        // todo use real tx
+        query_snip20_tx(
+            &deps.querier,
+            tx_id,
+            viewing_key,
+            tx_page,
+            &env.message.sender,
+        )?;
         new_weight_from_tx = 20;
 
-        println!("{}", tx_page);
+        println!("tx_page {}", tx_page);
         base_review.weight = Uint128::from(base_review.weight.u128() + new_weight_from_tx);
         base_review.tx_ids.push(tx_id);
     } else {
@@ -494,6 +507,7 @@ mod tests {
             title: "Fantastic!".to_string(),
             tx_id: 0,
             tx_page: 0,
+            viewing_key: "vk".to_string(),
         };
 
         let res = handle(&mut deps, env, msg);
@@ -545,6 +559,7 @@ mod tests {
             title: "Fantastic!".to_string(),
             tx_id: 0,
             tx_page: 0,
+            viewing_key: "vk".to_string(),
         };
 
         let res = handle(&mut deps, env, msg);
@@ -569,6 +584,7 @@ mod tests {
             title: "Fantastic2!".to_string(),
             tx_id: 0,
             tx_page: 0,
+            viewing_key: "vk".to_string(),
         };
         handle(&mut deps, env, msg)?;
 
@@ -581,6 +597,7 @@ mod tests {
             title: "Fantastic-3!".to_string(),
             tx_id: 0,
             tx_page: 0,
+            viewing_key: "vk".to_string(),
         };
         handle(&mut deps, env, msg)?;
 
@@ -593,6 +610,7 @@ mod tests {
             title: "Fantastic-4!".to_string(),
             tx_id: 0,
             tx_page: 0,
+            viewing_key: "vk".to_string(),
         };
         let res = handle(&mut deps, env, msg)?;
 
@@ -614,6 +632,7 @@ mod tests {
             title: "Fantastic-4!".to_string(),
             tx_id: 1,
             tx_page: 0,
+            viewing_key: "vk".to_string(),
         };
         let res = handle(&mut deps, env, msg)?;
         let res_unpacked = from_binary::<HandleAnswer>(&res.data.unwrap())?;

@@ -23,7 +23,8 @@ pub enum HandleMsg {
         rating: u8,
         title: String,
         tx_id: u64,
-        tx_page: u64,
+        tx_page: u32,
+        viewing_key: String,
     },
 }
 

@@ -213,6 +213,7 @@ function create_contract() {
     local init_result
     init_result="$(instantiate "$code_id" "$init_msg")"
 
+    log debug2
     if quiet jq -e '.logs == null' <<<"$init_result"; then
         local tx_hash
         tx_hash=$(jq -r '.txhash' <<<"$init_result")
@@ -220,7 +221,10 @@ function create_contract() {
         return 1
     fi
 
+    log debug3
+    log init result "$init_result"
     result=$(jq -r '.logs[0].events[0].attributes[] | select(.key == "contract_address") | .value' <<<"$init_result")
+    log debug4
 
     log "contract address is $result"
     echo "$result"

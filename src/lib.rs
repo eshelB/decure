@@ -1,5 +1,6 @@
 pub mod contract;
 pub mod msg;
+mod snip_20_query;
 pub mod state;
 mod utils;
 
