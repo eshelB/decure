@@ -83,7 +83,7 @@ fn review_business<S: Storage, A: Api, Q: Querier>(
             "There is no business registered on that address. You can register it instead.",
         ))?;
 
-    let previous_review = may_load_review(&deps.storage, &address, &env.message.sender)?;
+    let previous_review = may_load_review(&deps.storage, &address, &env.message.sender);
 
     let mut increment_count: u8 = 0;
     if previous_review.is_none() {
@@ -203,31 +203,24 @@ fn register_business<S: Storage, A: Api, Q: Querier>(
 
 pub fn query<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>, msg: QueryMsg) -> QueryResult {
     match msg {
-        QueryMsg::GetBusinesses {
-            start,
-            end,
-            page_size,
-        } => query_businesses(&deps.storage, start, end, page_size),
+        QueryMsg::GetBusinesses { start, page_size } => {
+            query_businesses(&deps.storage, start, page_size)
+        }
         QueryMsg::GetSingleBusiness { address } => query_business(&deps.storage, address),
         QueryMsg::GetReviewsOnBusiness {
             business_address,
             start,
-            end,
             page_size,
-        } => query_reviews(&deps.storage, business_address, start, end, page_size),
+        } => query_reviews(&deps.storage, business_address, start, page_size),
     }
 }
 
 pub fn query_businesses<S: Storage>(
     store: &S,
-    start: Option<String>,
-    end: Option<String>,
-    page_size: u8,
+    start: Option<u32>,
+    page_size: u32,
 ) -> StdResult<Binary> {
-    let start = start.as_ref().map(|x| x.as_bytes());
-    let end = end.as_ref().map(|x| x.as_bytes());
-
-    let (businesses_in_range, total) = get_businesses_page(store, start, end, page_size)?;
+    let (businesses_in_range, total) = get_businesses_page(store, start, page_size)?;
 
     to_binary(&QueryAnswer::Businesses {
         businesses: businesses_in_range,
@@ -258,15 +251,11 @@ pub fn query_business<S: Storage>(store: &S, address: HumanAddr) -> StdResult<Bi
 pub fn query_reviews<S: Storage>(
     store: &S,
     business_address: HumanAddr,
-    start: Option<String>,
-    end: Option<String>,
-    page_size: u8,
+    start: Option<u32>,
+    page_size: u32,
 ) -> StdResult<Binary> {
-    let start = start.as_ref().map(|x| x.as_bytes());
-    let end = end.as_ref().map(|x| x.as_bytes());
-
     let (reviews_page, total) =
-        get_reviews_on_business(store, &business_address, start, end, page_size)?;
+        get_reviews_on_business(store, &business_address, start, page_size)?;
 
     to_binary(&QueryAnswer::Reviews {
         reviews: reviews_page,
@@ -277,11 +266,12 @@ pub fn query_reviews<S: Storage>(
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env};
-    use cosmwasm_std::{coins, from_binary, Order, KV};
+    use cosmwasm_std::{coins, from_binary};
     use cosmwasm_storage::bucket;
+    use secret_toolkit::incubator::CashMap;
 
     use crate::msg::DisplayedReview;
-    use crate::state::{get_business_by_address, get_businesses_bucket};
+    use crate::state::get_business_by_address;
 
     use super::*;
 
@@ -300,17 +290,17 @@ mod tests {
             address: HumanAddr("mock-address".to_string()),
         };
         let res = handle(&mut deps, env, msg);
-        // println!("res: {:?}", res);
+        println!("res: {:?}", res);
         let res2 = res.unwrap();
-        // println!("res2: {:?}", res2);
+        println!("res2: {:?}", res2);
         let res3 = res2.data;
-        // println!("res3: {:?}", res3);
+        println!("res3: {:?}", res3);
         let res4 = res3.unwrap();
-        // println!("res4: {:?}", res4);
+        println!("res4: {:?}", res4);
         let res5: StdResult<HandleAnswer> = from_binary(&res4);
-        // println!("res5: {:?}", res5);
+        println!("res5: {:?}", res5);
         let res6: HandleAnswer = res5.unwrap();
-        // println!("res6: {:?}", res6);
+        println!("res6: {:?}", res6);
         match res6 {
             HandleAnswer::RegisterBusiness { status } => {
                 assert_eq!("successfully called register business", status);
@@ -335,29 +325,29 @@ mod tests {
         );
 
         // try range of businesses
-        // todo remove
-        let all_businesses = get_businesses_bucket(&deps.storage);
-        let vecbus: StdResult<Vec<KV<Business>>> =
-            all_businesses.range(None, None, Order::Ascending).collect();
-        assert_eq!(
-            vecbus.unwrap(),
-            vec!((
-                b"mock-address".to_vec(),
-                Business {
-                    name: "Starbucks".to_string(),
-                    address: HumanAddr("mock-address".to_string()),
-                    description: "a place to eat".to_string(),
-                    average_rating: 0,
-                    reviews_count: 0,
-                    total_weight: Uint128(0)
-                }
-            ))
-        );
+        // // todo remove
+        // let all_businesses = get_businesses_bucket(&deps.storage);
+        // let vecbus: StdResult<Vec<KV<Business>>> =
+        //     all_businesses.range(None, None, Order::Ascending).collect();
+        // assert_eq!(
+        //     vecbus.unwrap(),
+        //     vec!((
+        //         b"mock-address".to_vec(),
+        //         Business {
+        //             name: "Starbucks".to_string(),
+        //             address: HumanAddr("mock-address".to_string()),
+        //             description: "a place to eat".to_string(),
+        //             average_rating: 0,
+        //             reviews_count: 0,
+        //             total_weight: Uint128(0)
+        //         }
+        //     ))
+        // );
 
-        let mut all_businesses = bucket(b"businesses", &mut deps.storage);
-        all_businesses.save(
+        let mut all_businesses = CashMap::init(b"businesses", &mut deps.storage);
+        all_businesses.insert(
             b"second",
-            &Business {
+            Business {
                 address: HumanAddr("second".to_string()),
                 name: "second".to_string(),
                 description: "second".to_string(),
@@ -367,9 +357,9 @@ mod tests {
             },
         )?;
 
-        all_businesses.save(
+        all_businesses.insert(
             b"third",
-            &Business {
+            Business {
                 address: HumanAddr("third".to_string()),
                 name: "third".to_string(),
                 description: "third".to_string(),
@@ -379,9 +369,9 @@ mod tests {
             },
         )?;
 
-        all_businesses.save(
+        all_businesses.insert(
             b"arthur",
-            &Business {
+            Business {
                 address: HumanAddr("arthur".to_string()),
                 name: "arthur".to_string(),
                 description: "arthur the third".to_string(),
@@ -398,8 +388,7 @@ mod tests {
 
         // QUERY
         let msg = QueryMsg::GetBusinesses {
-            start: Some("third".to_string()), //only last element
-            end: None,
+            start: Some(1),
             page_size: 2,
         };
 
@@ -407,27 +396,9 @@ mod tests {
         let res_unpacked: QueryAnswer = from_binary(&res.unwrap()).unwrap();
         match res_unpacked {
             QueryAnswer::Businesses { businesses, total } => {
-                assert_eq!(total.u128(), 4);
+                assert_eq!(total, 4);
                 // println!("{:?}", businesses);
-                assert_eq!(businesses.len(), 1);
-                println!("success")
-            }
-            _ => panic!("wrong query variant"),
-        }
-
-        let msg = QueryMsg::GetBusinesses {
-            start: None,
-            end: Some("third".to_string()), //up to "second" element, (which is 3rd)
-            page_size: 4,
-        };
-
-        let res = query(&deps, msg);
-        let res_unpacked: QueryAnswer = from_binary(&res.unwrap()).unwrap();
-        match res_unpacked {
-            QueryAnswer::Businesses { businesses, total } => {
-                assert_eq!(total.u128(), 4);
-                println!("end query {:?}", businesses);
-                assert_eq!(businesses.len(), 3);
+                assert_eq!(businesses[0].address.as_str(), "third");
                 println!("success")
             }
             _ => panic!("wrong query variant"),
@@ -650,7 +621,6 @@ mod tests {
         let msg = QueryMsg::GetReviewsOnBusiness {
             business_address: HumanAddr("mock-address".to_string()),
             start: None,
-            end: None,
             page_size: 4,
         };
 
@@ -658,7 +628,7 @@ mod tests {
         let res_unpacked: QueryAnswer = from_binary(&res.unwrap()).unwrap();
         match res_unpacked {
             QueryAnswer::Reviews { reviews, total } => {
-                assert_eq!(total.u128(), 2);
+                assert_eq!(total, 2);
                 println!("reviews query {:?}", reviews);
                 assert_eq!(reviews.len(), 2);
                 assert_eq!(

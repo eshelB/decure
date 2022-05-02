@@ -1,12 +1,13 @@
-use cosmwasm_std::{HumanAddr, Order, StdError, StdResult, Storage, Uint128, KV};
-use cosmwasm_storage::{bucket, bucket_read, Bucket, ReadonlyBucket};
+use cosmwasm_std::{HumanAddr, ReadonlyStorage, StdError, StdResult, Storage, Uint128};
+use cosmwasm_std::{Order, KV};
 use schemars::JsonSchema;
+use secret_toolkit::incubator::{CashMap, ReadOnlyCashMap};
 use serde::{Deserialize, Serialize};
 
 use crate::msg::DisplayedReview;
 
 pub static KEY_BUSINESSES: &[u8] = b"businesses";
-pub static PREFIX_REVIEWS: &[u8] = b"reviews";
+pub static PREFIX_REVIEWS: &str = "reviews";
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -17,15 +18,13 @@ pub struct Business {
     pub average_rating: u32, // max - maxint, min - 0
     pub reviews_count: u32,
 
-    // todo - kept private (implement DisplayedBusiness)
     pub total_weight: Uint128,
 }
 
 pub fn create_business<S: Storage>(store: &mut S, business: Business) -> StdResult<()> {
-    let mut all_businesses = bucket(KEY_BUSINESSES, store);
-    let existing_business = all_businesses
-        .may_load(business.address.as_str().as_bytes())
-        .map_err(|_| StdError::generic_err("couldn't load businesses"))?;
+    let mut all_businesses = CashMap::init(KEY_BUSINESSES, store);
+    let existing_business: Option<Business> =
+        all_businesses.get(business.address.as_str().as_bytes());
 
     match existing_business {
         Some(..) => Err(StdError::generic_err(format!(
@@ -37,7 +36,7 @@ pub fn create_business<S: Storage>(store: &mut S, business: Business) -> StdResu
                 "saving business {:?} on address {:?}",
                 business, business.address
             );
-            all_businesses.save(business.address.as_str().as_bytes(), &business)?;
+            all_businesses.insert(business.address.as_str().as_bytes(), business.clone())?;
             Ok(())
         }
     }
@@ -49,58 +48,55 @@ pub fn apply_review_on_business<S: Storage>(
     new_total_weight: u32,
     new_average_rating: u32,
     is_new: u8,
-) -> StdResult<Business> {
-    let mut all_businesses = bucket(KEY_BUSINESSES, store);
-    all_businesses.update(
-        business_address.as_str().as_bytes(),
-        |business: Option<Business>| match business {
-            Some(mut b) => {
-                b.average_rating = new_average_rating;
-                //todo unite casting types
-                b.total_weight = Uint128::from(new_total_weight as u128);
-                b.reviews_count += is_new as u32;
-                Ok(b)
-            }
-            None => Err(StdError::generic_err(
-                "Critical failure updating existing business",
-            )),
-        },
-    )
+) -> StdResult<()> {
+    let mut all_businesses = CashMap::init(KEY_BUSINESSES, store);
+    let business: Option<Business> = all_businesses.get(business_address.as_str().as_bytes());
+
+    match business {
+        Some(mut b) => {
+            b.average_rating = new_average_rating;
+            //todo unite casting types
+            b.total_weight = Uint128::from(new_total_weight as u128);
+            b.reviews_count += is_new as u32;
+            all_businesses.insert(business_address.as_str().as_bytes(), b);
+            Ok(())
+        }
+        None => Err(StdError::generic_err(
+            "Critical failure updating existing business",
+        )),
+    }
 }
 
 // todo for testing purposes, remove in final version.
-pub fn get_businesses_bucket<S: Storage>(store: &S) -> ReadonlyBucket<S, Business> {
-    bucket_read(KEY_BUSINESSES, store)
+pub fn get_businesses_bucket<S: Storage>(store: &S) -> ReadOnlyCashMap<Business, S> {
+    ReadOnlyCashMap::init(KEY_BUSINESSES, &store)
 }
 
-pub fn get_businesses_page<S: Storage>(
+pub fn get_businesses_page<S: ReadonlyStorage>(
     store: &S,
-    start: Option<&[u8]>,
-    end: Option<&[u8]>,
-    page_size: u8,
-) -> StdResult<(Vec<Business>, Uint128)> {
-    let all_businesses = bucket_read(KEY_BUSINESSES, store);
+    start: Option<u32>,
+    page_size: u32,
+) -> StdResult<(Vec<Business>, u32)> {
+    let all_businesses = ReadOnlyCashMap::init(KEY_BUSINESSES, store);
 
-    let businesses_page: Vec<Business> = all_businesses
-        .range(start, end, Order::Ascending)
-        .take(page_size as usize)
-        .map(|b: StdResult<KV<Business>>| b.unwrap().1)
-        .collect();
+    let businesses_page: Vec<Business> = all_businesses.paging(start.unwrap_or(0), page_size)?;
+    // .map(|b: StdResult<KV<Business>>| b.unwrap().1)
+    // .collect();
 
-    let all_businesses_count = all_businesses.range(None, None, Order::Ascending).count();
+    let businesses_len: u32 = all_businesses.len();
 
-    Ok((businesses_page, Uint128::from(all_businesses_count as u128)))
+    Ok((businesses_page, businesses_len))
 }
 
-pub fn get_business_by_address<S: Storage>(
+pub fn get_business_by_address<S: ReadonlyStorage>(
     store: &S,
     address: &HumanAddr,
 ) -> StdResult<Option<Business>> {
-    let all_businesses = bucket_read(KEY_BUSINESSES, store);
-    let existing_business = all_businesses.may_load(address.as_str().as_bytes());
+    let all_businesses = ReadOnlyCashMap::init(KEY_BUSINESSES, store);
+    let existing_business = all_businesses.get(address.as_str().as_bytes());
 
     println!("getting business address {:?}", address);
-    existing_business
+    Ok(existing_business)
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -120,15 +116,14 @@ pub fn may_load_review<S: Storage>(
     store: &S,
     business_address: &HumanAddr,
     reviewer_address: &HumanAddr,
-) -> StdResult<Option<Review>> {
-    let reviews_on_business = ReadonlyBucket::multilevel(
-        &[PREFIX_REVIEWS, business_address.as_str().as_bytes()],
-        store,
-    );
+) -> Option<Review> {
+    let mut namespace = String::from(PREFIX_REVIEWS);
+    namespace.push_str(business_address.as_str());
+    let namespace: &[u8] = namespace.as_bytes();
 
-    reviews_on_business
-        .may_load(&reviewer_address.as_str().as_bytes())
-        .map_err(|_| StdError::generic_err("couldn't load review for business"))
+    let reviews_on_business: ReadOnlyCashMap<Review, S> = ReadOnlyCashMap::init(namespace, store);
+
+    reviews_on_business.get(&reviewer_address.as_str().as_bytes())
 }
 
 pub fn create_review<S: Storage>(
@@ -137,45 +132,42 @@ pub fn create_review<S: Storage>(
     reviewer_address: &HumanAddr,
     review: Review,
 ) -> StdResult<()> {
-    let mut reviews_on_business: Bucket<S, Review> = Bucket::multilevel(
-        &[PREFIX_REVIEWS, business_address.as_str().as_bytes()],
-        store,
-    );
+    let mut namespace = String::from(PREFIX_REVIEWS);
+    namespace.push_str(business_address.as_str());
+    let namespace: &[u8] = namespace.as_bytes();
+
+    let mut reviews_on_business: CashMap<Review, S> = CashMap::init(namespace, store);
 
     reviews_on_business
-        .save(reviewer_address.as_str().as_bytes(), &review)
+        .insert(reviewer_address.as_str().as_bytes(), review)
         .map_err(|_| StdError::generic_err("couldn't save review for business"))
 }
 
 pub fn get_reviews_on_business<S: Storage>(
     store: &S,
     business_address: &HumanAddr,
-    start: Option<&[u8]>,
-    end: Option<&[u8]>,
-    page_size: u8,
-) -> StdResult<(Vec<DisplayedReview>, Uint128)> {
-    let reviews_on_business: ReadonlyBucket<S, Review> = ReadonlyBucket::multilevel(
-        &[PREFIX_REVIEWS, business_address.as_str().as_bytes()],
-        store,
-    );
+    start: Option<u32>,
+    page_size: u32,
+) -> StdResult<(Vec<DisplayedReview>, u32)> {
+    let mut namespace = String::from(PREFIX_REVIEWS);
+    namespace.push_str(business_address.as_str());
+    let namespace: &[u8] = namespace.as_bytes();
 
-    let reviews_page: Vec<DisplayedReview> = reviews_on_business
-        .range(start, end, Order::Ascending)
-        .take(page_size as usize)
-        .map(|b: StdResult<KV<Review>>| {
-            let review = b.unwrap().1;
-            DisplayedReview {
-                title: review.title,
-                content: review.content,
-                rating: review.rating,
-                last_update_timestamp: review.last_update_timestamp,
-            }
+    let reviews_on_business: ReadOnlyCashMap<Review, S> = ReadOnlyCashMap::init(namespace, store);
+
+    let reviews_page: Vec<Review> = reviews_on_business.paging(start.unwrap_or(0), page_size)?;
+
+    let displayed_page: Vec<DisplayedReview> = reviews_page
+        .iter()
+        .map(|review: &Review| DisplayedReview {
+            title: review.title.clone(),
+            content: review.content.clone(),
+            rating: review.rating.clone(),
+            last_update_timestamp: review.last_update_timestamp,
         })
         .collect();
 
-    let reviews_count = reviews_on_business
-        .range(None, None, Order::Ascending)
-        .count();
+    let reviews_count = reviews_on_business.len();
 
-    Ok((reviews_page, Uint128::from(reviews_count as u128)))
+    Ok((displayed_page, reviews_count))
 }

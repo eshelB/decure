@@ -39,18 +39,16 @@ pub enum HandleAnswer {
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
     GetBusinesses {
-        start: Option<String>,
-        end: Option<String>,
-        page_size: u8,
+        start: Option<u32>,
+        page_size: u32,
     },
     GetSingleBusiness {
         address: HumanAddr,
     },
     GetReviewsOnBusiness {
         business_address: HumanAddr,
-        start: Option<String>,
-        end: Option<String>,
-        page_size: u8,
+        start: Option<u32>,
+        page_size: u32,
     },
 }
 
@@ -79,7 +77,7 @@ pub struct DisplayedBusiness {
 pub enum QueryAnswer {
     Businesses {
         businesses: Vec<Business>,
-        total: Uint128,
+        total: u32,
     },
     SingleBusiness {
         business: Option<DisplayedBusiness>,
@@ -87,7 +85,7 @@ pub enum QueryAnswer {
     },
     Reviews {
         reviews: Vec<DisplayedReview>,
-        total: Uint128,
+        total: u32,
     },
 }
 

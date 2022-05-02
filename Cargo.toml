@@ -38,9 +38,9 @@ backtraces = ["cosmwasm-std/backtraces"]
 snafu = { version = "0.6.3" }
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
 schemars = "0.7"
-cosmwasm-storage = { version = "0.10.0", features = ["iterator"], package = "secret-cosmwasm-storage" }
+cosmwasm-storage = { version = "0.10.0", package = "secret-cosmwasm-storage", features = ["iterator"]}
 cosmwasm-std = { version = "0.10.0", package = "secret-cosmwasm-std" }
-secret-toolkit = "0.2.0" # Uncomment this for extra tools
+secret-toolkit = { version = "0.2.0", features = ["incubator"] }
 
 [dev-dependencies]
 cosmwasm-schema = "0.10.1"
