@@ -125,7 +125,17 @@ fn review_business<S: Storage, A: Api, Q: Querier>(
             &env.message.sender,
         )?;
 
-        // todo validate tx sender and receiver
+        if tx.sender != env.message.sender {
+            return Err(StdError::generic_err(
+                "The specified transfer was not spent by the authenticated account",
+            ));
+        }
+
+        if tx.receiver != address {
+            return Err(StdError::generic_err(
+                "The specified transfer's recipient is not the specified business",
+            ));
+        }
         new_weight_from_tx = tx.coins.amount.u128();
 
         println!("tx_page {}", tx_page);
