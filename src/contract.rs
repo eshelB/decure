@@ -160,19 +160,17 @@ fn review_business<S: Storage, A: Api, Q: Querier>(
     let (new_average, new_weight) = recalculate_weighted_average(
         new_weight_from_tx,
         previous_weight,
-        // todo verify casting
         rating as u128,
         previous_rating as u128,
         existing_business.total_weight.u128(),
-        existing_business.average_rating as u128,
+        existing_business.average_rating.u128(),
     )?;
 
     apply_review_on_business(
         &mut deps.storage,
         address,
-        // todo verify casting
-        new_weight as u32,
-        new_average as u32,
+        new_weight,
+        new_average,
         increment_count,
     )?;
 
@@ -207,9 +205,9 @@ fn register_business<S: Storage, A: Api, Q: Querier>(
         name,
         description,
         address: HumanAddr(address.to_string()),
-        average_rating: 0,
+        average_rating: Uint128::from(0u128),
         reviews_count: 0,
-        total_weight: Uint128(0),
+        total_weight: Uint128::from(0u128),
     };
 
     create_business(&mut deps.storage, new_business)?;
@@ -345,7 +343,7 @@ mod tests {
                 address: HumanAddr("mock-address".to_string()),
                 name: "Starbucks".to_string(),
                 description: "a place to eat".to_string(),
-                average_rating: 0,
+                average_rating: Uint128::from(0u128),
                 reviews_count: 0,
                 total_weight: Uint128(0)
             }
@@ -358,7 +356,7 @@ mod tests {
                 address: HumanAddr("second".to_string()),
                 name: "second".to_string(),
                 description: "second".to_string(),
-                average_rating: 0,
+                average_rating: Uint128::from(0u128),
                 reviews_count: 0,
                 total_weight: Default::default(),
             },
@@ -370,7 +368,7 @@ mod tests {
                 address: HumanAddr("third".to_string()),
                 name: "third".to_string(),
                 description: "third".to_string(),
-                average_rating: 0,
+                average_rating: Uint128::from(0u128),
                 reviews_count: 0,
                 total_weight: Default::default(),
             },
@@ -382,7 +380,7 @@ mod tests {
                 address: HumanAddr("arthur".to_string()),
                 name: "arthur".to_string(),
                 description: "arthur the third".to_string(),
-                average_rating: 0,
+                average_rating: Uint128::from(0u128),
                 reviews_count: 0,
                 total_weight: Default::default(),
             },
@@ -711,7 +709,7 @@ mod tests {
                         name: "Starbucks".to_string(),
                         description: "a place to eat".to_string(),
                         address: HumanAddr("mock-address".to_string()),
-                        average_rating: 3666, // the weight of 4-star reviews is twice the weight of 3-star reviews
+                        average_rating: Uint128(3666), // the weight of 4-star reviews is twice the weight of 3-star reviews
                         reviews_count: 2,
                     }
                 );

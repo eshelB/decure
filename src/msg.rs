@@ -64,7 +64,7 @@ pub struct DisplayedBusiness {
     pub name: String,
     pub description: String,
     pub address: HumanAddr,
-    pub average_rating: u32, // max - 5000, min - 0
+    pub average_rating: Uint128, // max - 5000, min - 0
     pub reviews_count: u32,
 }
 

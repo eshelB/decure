@@ -14,7 +14,7 @@ pub struct Business {
     pub name: String,
     pub description: String,
     pub address: HumanAddr,
-    pub average_rating: u32, // max - maxint, min - 0
+    pub average_rating: Uint128, // max - 5000, min - 0
     pub reviews_count: u32,
 
     pub total_weight: Uint128,
@@ -39,8 +39,8 @@ pub fn create_business<S: Storage>(store: &mut S, business: Business) -> StdResu
 pub fn apply_review_on_business<S: Storage>(
     store: &mut S,
     business_address: HumanAddr,
-    new_total_weight: u32,
-    new_average_rating: u32,
+    new_total_weight: u128,
+    new_average_rating: u128,
     is_new: u8,
 ) -> StdResult<()> {
     let mut all_businesses = CashMap::init(KEY_BUSINESSES, store);
@@ -48,9 +48,9 @@ pub fn apply_review_on_business<S: Storage>(
 
     match business {
         Some(mut b) => {
-            b.average_rating = new_average_rating;
+            b.average_rating = Uint128::from(new_average_rating);
             //todo unite casting types
-            b.total_weight = Uint128::from(new_total_weight as u128);
+            b.total_weight = Uint128::from(new_total_weight);
             b.reviews_count += is_new as u32;
             all_businesses.insert(business_address.as_str().as_bytes(), b)?;
             Ok(())

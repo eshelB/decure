@@ -272,6 +272,40 @@ function test_register_existing_business() {
     log "register existing business: SUCCESS!"
 }
 
+function test_review_tx_bad_recipient () {
+    set -e
+    local contract_addr="$1"
+    local business_addr="$2"
+
+    log_test_header
+
+    local review_message
+    # note that this tx_id belongs to "a" but it is sent to "c" (b is the business)
+    review_message='{
+      "review_business": {
+        "address":"'"$business_addr"'",
+        "content":"unexistent tx",
+        "rating":0,
+        "title":"better going somewhere else",
+        "tx_id": 8,
+        "tx_page": 0,
+        "viewing_key": "vk"
+      }
+    }'
+
+    log message "$(jq '.output_error' <<< "$review_message")"
+    tx_hash="$(compute_execute "$contract_addr" "$review_message" --from a --gas 150000 -y)"
+    local review_message_result
+    ! review_message_result="$(wait_for_compute_tx "$tx_hash" 'waiting for review business with unexistent tx')"
+    log result "$(jq '.output_error' <<< "$review_message_result")"
+
+    assert_eq \
+        "$(get_generic_err "$review_message_result")" \
+        "The specified transfer's recipient is not the specified business"
+
+    log "review business with unexistent TX: SUCCESS!"
+}
+
 function test_review_unexistent_tx () {
     set -e
     local contract_addr="$1"
@@ -344,7 +378,7 @@ function test_reviews () {
 
     result="$(compute_query "$contract_addr" "$query_single_business_message" 2>&1 || true )"
     result_comparable=$(echo $result | sed 's/ Usage:.*//')
-    assert_eq "$result_comparable" '{"single_business":{"business":{"name":"Starbucks","description":"a place to eat","address":"secret1fc3fzy78ttp0lwuujw7e52rhspxn8uj52zfyne","average_rating":5000,"reviews_count":1},"status":"Successfully retrieved business by address"}}'
+    assert_eq "$result_comparable" '{"single_business":{"business":{"name":"Starbucks","description":"a place to eat","address":"secret1fc3fzy78ttp0lwuujw7e52rhspxn8uj52zfyne","average_rating":"5000","reviews_count":1},"status":"Successfully retrieved business by address"}}'
     local rating
     rating="$(jq -er '.single_business.business.average_rating' <<< "$result_comparable")"
     log "rating after a rated: $rating"
@@ -589,11 +623,11 @@ function main() {
 
     log
     log "########### VALIDATIONS ##################"
-    # test_review_unexistent_tx "$contract_addr" "$business_address"
-    # test_register_existing_business "$contract_addr" "$business_address"
-    # test_register_business_long_name "$contract_addr"
-    # test_register_business_long_description "$contract_addr"
-    # test_register_business_long_description "$contract_addr"
+    test_review_unexistent_tx "$contract_addr" "$business_address"
+    test_register_existing_business "$contract_addr" "$business_address"
+    test_register_business_long_name "$contract_addr"
+    test_register_business_long_description "$contract_addr"
+    test_review_tx_bad_recipient "$contract_addr" "$business_address"
 
     log 'deploy + test completed successfully'
 
