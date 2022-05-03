@@ -27,18 +27,7 @@ pub fn query_snip20_tx<Q: Querier>(
 
     let specific_tx = tx_history.txs.iter().find(|&x| x.id == tx_id);
     match specific_tx {
-        Some(tx) => {
-            //todo remove
-            println!(
-                "the tx with id {} from the query is {:?}, and its amount is {:?}",
-                tx_id,
-                tx,
-                tx.coins.amount.u128()
-            );
-
-            Ok(tx.clone())
-        }
-
+        Some(tx) => Ok(tx.clone()),
         None => Err(StdError::generic_err(format!(
             "there was no transaction with id {} in the specified page",
             tx_id

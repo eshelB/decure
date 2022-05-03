@@ -351,26 +351,6 @@ mod tests {
             }
         );
 
-        // try range of businesses
-        // // todo remove
-        // let all_businesses = get_businesses_bucket(&deps.storage);
-        // let vecbus: StdResult<Vec<KV<Business>>> =
-        //     all_businesses.range(None, None, Order::Ascending).collect();
-        // assert_eq!(
-        //     vecbus.unwrap(),
-        //     vec!((
-        //         b"mock-address".to_vec(),
-        //         Business {
-        //             name: "Starbucks".to_string(),
-        //             address: HumanAddr("mock-address".to_string()),
-        //             description: "a place to eat".to_string(),
-        //             average_rating: 0,
-        //             reviews_count: 0,
-        //             total_weight: Uint128(0)
-        //         }
-        //     ))
-        // );
-
         let mut all_businesses = CashMap::init(b"businesses", &mut deps.storage);
         all_businesses.insert(
             b"second",
@@ -407,11 +387,6 @@ mod tests {
                 total_weight: Default::default(),
             },
         )?;
-
-        // let vecbus: StdResult<Vec<KV<Business>>> =
-        //     // all_businesses.range(None, None, Order::Ascending).collect();
-        //     // all_businesses.range(Some(b"secone"), None, Order::Ascending).collect();
-        //     all_businesses.range(None, None, Order::Ascending).collect();
 
         // QUERY
         let msg = QueryMsg::GetBusinesses {
@@ -509,7 +484,6 @@ mod tests {
         };
 
         let res = handle(&mut deps, env, msg);
-
         let error = res.unwrap_err();
 
         if let StdError::GenericErr { msg, .. } = error {

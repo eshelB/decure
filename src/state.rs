@@ -30,11 +30,6 @@ pub fn create_business<S: Storage>(store: &mut S, business: Business) -> StdResu
             "A business is already registered on that address",
         ))),
         None => {
-            // todo remove print
-            println!(
-                "saving business {:?} on address {:?}",
-                business, business.address
-            );
             all_businesses.insert(business.address.as_str().as_bytes(), business.clone())?;
             Ok(())
         }
@@ -66,11 +61,6 @@ pub fn apply_review_on_business<S: Storage>(
     }
 }
 
-// todo for testing purposes, remove in final version.
-pub fn get_businesses_bucket<S: Storage>(store: &S) -> ReadOnlyCashMap<Business, S> {
-    ReadOnlyCashMap::init(KEY_BUSINESSES, &store)
-}
-
 pub fn get_businesses_page<S: ReadonlyStorage>(
     store: &S,
     start: Option<u32>,
@@ -79,9 +69,6 @@ pub fn get_businesses_page<S: ReadonlyStorage>(
     let all_businesses = ReadOnlyCashMap::init(KEY_BUSINESSES, store);
 
     let businesses_page: Vec<Business> = all_businesses.paging(start.unwrap_or(0), page_size)?;
-    // .map(|b: StdResult<KV<Business>>| b.unwrap().1)
-    // .collect();
-
     let businesses_len: u32 = all_businesses.len();
 
     Ok((businesses_page, businesses_len))
@@ -153,7 +140,6 @@ pub fn get_reviews_on_business<S: Storage>(
     let namespace: &[u8] = namespace.as_bytes();
 
     let reviews_on_business: ReadOnlyCashMap<Review, S> = ReadOnlyCashMap::init(namespace, store);
-
     let reviews_page: Vec<Review> = reviews_on_business.paging(start.unwrap_or(0), page_size)?;
 
     let displayed_page: Vec<DisplayedReview> = reviews_page
