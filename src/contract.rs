@@ -229,9 +229,19 @@ pub fn query_businesses<S: Storage>(
     page_size: u32,
 ) -> StdResult<Binary> {
     let (businesses_in_range, total) = get_businesses_page(store, start, page_size)?;
+    let displayed_businesses = businesses_in_range
+        .iter()
+        .map(|b| DisplayedBusiness {
+            name: b.name.clone(),
+            description: b.description.clone(),
+            address: b.address.clone(),
+            average_rating: b.average_rating.clone(),
+            reviews_count: b.reviews_count.clone(),
+        })
+        .collect();
 
     to_binary(&QueryAnswer::Businesses {
-        businesses: businesses_in_range,
+        businesses: displayed_businesses,
         total,
     })
 }

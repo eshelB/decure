@@ -1,4 +1,3 @@
-use crate::state::Business;
 use cosmwasm_std::{HumanAddr, Uint128};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -74,7 +73,7 @@ pub struct DisplayedBusiness {
 #[serde(rename_all = "snake_case")]
 pub enum QueryAnswer {
     Businesses {
-        businesses: Vec<Business>,
+        businesses: Vec<DisplayedBusiness>,
         total: u32,
     },
     SingleBusiness {
