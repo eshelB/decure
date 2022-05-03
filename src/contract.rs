@@ -107,7 +107,7 @@ fn review_business<S: Storage, A: Api, Q: Querier>(
         rating: 0,
         weight: Uint128(0),
         tx_ids: vec![],
-        last_update_timestamp: Default::default(),
+        last_update_timestamp: env.block.time,
     });
 
     let previous_weight = base_review.weight.u128();
@@ -295,10 +295,8 @@ mod tests {
     use cosmwasm_std::{coins, from_binary};
     use secret_toolkit::incubator::CashMap;
 
-    use crate::msg::DisplayedReview;
-    use crate::state::get_business_by_address;
-
     use super::*;
+    use crate::state::get_business_by_address;
 
     #[test]
     fn register_business() -> StdResult<()> {

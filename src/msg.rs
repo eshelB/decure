@@ -55,7 +55,7 @@ pub struct DisplayedReview {
     pub title: String,
     pub content: String,
     pub rating: u8, // 0 to 5
-    pub last_update_timestamp: Uint128,
+    pub last_update_timestamp: u64,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

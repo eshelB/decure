@@ -49,7 +49,6 @@ pub fn apply_review_on_business<S: Storage>(
     match business {
         Some(mut b) => {
             b.average_rating = Uint128::from(new_average_rating);
-            //todo unite casting types
             b.total_weight = Uint128::from(new_total_weight);
             b.reviews_count += is_new as u32;
             all_businesses.insert(business_address.as_str().as_bytes(), b)?;
@@ -90,8 +89,8 @@ pub fn get_business_by_address<S: ReadonlyStorage>(
 pub struct Review {
     pub title: String,
     pub content: String,
-    pub rating: u8,                     // 0 to 5
-    pub last_update_timestamp: Uint128, // todo implement
+    pub rating: u8, // 0 to 5
+    pub last_update_timestamp: u64,
 
     // kept private
     pub weight: Uint128,
