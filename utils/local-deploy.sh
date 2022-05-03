@@ -71,21 +71,21 @@ function wait_for_tx() {
 
     local result
 
-    log "waiting on tx: $tx_hash"
+    # log "waiting on tx: $tx_hash"
     # secretcli will only print to stdout when it succeeds
     until result="$(secretcli query tx "$tx_hash" 2>/dev/null)"; do
         log "$message"
         sleep 1
     done
 
-    log "init complete"
+    # log "init complete"
 
     # log out-of-gas events
     if quiet jq -e '.raw_log | startswith("execute contract failed: Out of gas: ") or startswith("out of gas:")' <<<"$result"; then
         log "$(jq -r '.raw_log' <<<"$result")"
     fi
 
-    log "finish wait"
+    # log "finish wait"
 
     echo "$result"
 }
@@ -105,7 +105,7 @@ function wait_for_compute_tx() {
         return_value=1
     fi
     decrypted="$(secretcli query compute tx "$tx_hash")" || return
-    log "$decrypted"
+    # log "$decrypted"
     echo "$decrypted"
 
     return "$return_value"
@@ -213,7 +213,6 @@ function create_contract() {
     local init_result
     init_result="$(instantiate "$code_id" "$init_msg")"
 
-    log debug2
     if quiet jq -e '.logs == null' <<<"$init_result"; then
         local tx_hash
         tx_hash=$(jq -r '.txhash' <<<"$init_result")
@@ -221,83 +220,16 @@ function create_contract() {
         return 1
     fi
 
-    log debug3
     # log init result "$init_result"
     result=$(jq -r '.logs[0].events[0].attributes[] | select(.key == "contract_address") | .value' <<<"$init_result")
-    log debug4
 
     log "contract address is $result"
     echo "$result"
 }
 
 function log_test_header() {
-    log " ########### Starting ${FUNCNAME[1]} ###############################################################################################################################################"
-}
-
-function sign_permit() {
-    set -e
-    local permit="$1"
-    local key="$2"
-
-    local sig
-    if [[ -z "${IS_GITHUB_ACTIONS+x}" ]]; then
-      sig=$(docker exec secretdev bash -c "/usr/bin/secretd tx sign-doc <(echo '"$permit"') --from '$key'")
-    else
-      sig=$(secretcli tx sign-doc <(echo "$permit") --from "$key")
-    fi
-
-    echo "$sig"
-}
-
-function test_query_with_permit_after() {
-    set -e
-    local contract_addr="$1"
-
-    log_test_header
-
-    # common variables
-    local result
-    local tx_hash
-
-    local permit
-    local permit_query
-    local expected_output
-    local sig
-    permit='{"account_number":"0","sequence":"0","chain_id":"blabla","msgs":[{"type":"query_permit","value":{"permit_name":"test","allowed_tokens":["'"$contract_addr"'"],"permissions":["calculation_history"]}}],"fee":{"amount":[{"denom":"uscrt","amount":"0"}],"gas":"1"},"memo":""}'
-
-    key=a
-    expected_output='{"calculation_history":{"calcs":[{"left_operand":"23","right_operand":null,"operation":"Sqrt","result":"4"},{"left_operand":"23","right_operand":"3","operation":"Div","result":"7"},{"left_operand":"23","right_operand":"3","operation":"Mul","result":"69"}],"total":"5"}}'
-
-    sig=$(sign_permit "$permit" "$key")
-    permit_query='{"with_permit":{"query":{"calculation_history":{"page_size":"3"}},"permit":{"params":{"permit_name":"test","chain_id":"blabla","allowed_tokens":["'"$contract_addr"'"],"permissions":["calculation_history"]},"signature":'"$sig"'}}}'
-    result="$(compute_query "$contract_addr" "$permit_query" 2>&1 || true )"
-    result_comparable=$(echo $result | sed 's/ Usage:.*//')
-    assert_eq "$result_comparable" "$expected_output"
-    log "query result populated history: ASSERTION_SUCCESS"
-
-    key=b
-    expected_output='{"calculation_history":{"calcs":[],"total":"0"}}'
-
-    sig=$(sign_permit "$permit" "$key")
-    permit_query='{"with_permit":{"query":{"calculation_history":{"page_size":"3"}},"permit":{"params":{"permit_name":"test","chain_id":"blabla","allowed_tokens":["'"$contract_addr"'"],"permissions":["calculation_history"]},"signature":'"$sig"'}}}'
-    result="$(compute_query "$contract_addr" "$permit_query" 2>&1 || true )"
-    result_comparable=$(echo $result | sed 's/ Usage:.*//')
-    assert_eq "$result_comparable" "$expected_output"
-    log "query result for empty history: ASSERTION_SUCCESS"
-}
-
-function test_query() {
-    set -e
-    local contract_addr="$1"
-
-    log_test_header
-    expected_error="Error: this is the expected error"
-
-    result="$(compute_query "$contract_addr" "" 2>&1 || true )"
-    result_comparable=$(echo $result | sed 's/Usage:.*//' | awk '{$1=$1};1')
-
-    assert_eq "$result_comparable" "$expected_error"
-    log "no contract in permit: ASSERTION_SUCCESS"
+    log
+    log "########### Starting ${FUNCNAME[1]} ####################################################################################################################################"
 }
 
 function test_register_business() {
@@ -308,10 +240,10 @@ function test_register_business() {
     log_test_header
 
     register_business_message='{"register_business":{"name":"Starbucks","description":"a place to eat","address":"'"$business_addr"'"}}'
-    log "message: $register_business_message"
+    log message "$(jq <<< "$register_business_message")"
     tx_hash="$(compute_execute "$contract_addr" "$register_business_message" --from a --gas 150000 -y)"
     register_business_result="$(data_of wait_for_compute_tx "$tx_hash" 'waiting for register_business from "a" to process')"
-    log result "$register_business_result"
+    log result "$(jq <<< "$register_business_result")"
     local status
     status=$(jq -er '.register_business.status' <<< "$register_business_result")
 
@@ -328,7 +260,7 @@ function test_register_existing_business() {
     log_test_header
 
     register_business_message='{"register_business":{"name":"Starbucks","description":"a place to eat","address":"'"$business_addr"'"}}'
-    log "message: $register_business_message"
+    log message "$(jq <<< "$register_business_message")"
     tx_hash="$(compute_execute "$contract_addr" "$register_business_message" --from a --gas 150000 -y)"
     local register_business_result
     ! register_business_result="$(wait_for_compute_tx "$tx_hash" 'waiting for register_business')"
@@ -337,12 +269,44 @@ function test_register_existing_business() {
         "$(get_generic_err "$register_business_result")" \
         "A business is already registered on that address"
 
-    assert_eq "$status" "successfully called register business"
-
     log "register existing business: SUCCESS!"
 }
 
-function test_review () {
+function test_review_unexistent_tx () {
+    set -e
+    local contract_addr="$1"
+    local business_addr="$2"
+
+    log_test_header
+
+    local review_message
+    # note that this tx_id belongs to "d" and not to "c"
+    review_message='{
+      "review_business": {
+        "address":"'"$business_addr"'",
+        "content":"unexistent tx",
+        "rating":0,
+        "title":"better going somewhere else",
+        "tx_id": 7,
+        "tx_page": 0,
+        "viewing_key": "vk"
+      }
+    }'
+
+    log message "$(jq '.output_error' <<< "$review_message")"
+    tx_hash="$(compute_execute "$contract_addr" "$review_message" --from a --gas 150000 -y)"
+    local review_message_result
+    ! review_message_result="$(wait_for_compute_tx "$tx_hash" 'waiting for review business with unexistent tx')"
+    log result "$(jq '.output_error' <<< "$review_message_result")"
+
+    assert_eq \
+        "$(get_generic_err "$review_message_result")" \
+        "there was no transaction with id 7 in the specified page"
+
+    log "review business with unexistent TX: SUCCESS!"
+}
+
+function test_reviews () {
     set -e
     local contract_addr="$1"
     local business_addr="$2"
@@ -352,9 +316,9 @@ function test_review () {
     local review_message
     review_message='{
       "review_business": {
-        "address":"'"$business_addr"'",
-        "content":"great stuff!",
-        "rating":5,
+        "address": "'"$business_addr"'",
+        "content": "great stuff!",
+        "rating": 5,
         "title":"amazing restaurant",
         "tx_id": 2,
         "tx_page": 0,
@@ -363,8 +327,8 @@ function test_review () {
     }'
 
     tx_hash="$(compute_execute "$contract_addr" "$review_message" --from a --gas 150000 -y)"
-    review_business_result="$(data_of wait_for_compute_tx "$tx_hash" 'waiting for register_business from "a" to process')"
-    log result "$review_business_result"
+    review_business_result="$(data_of wait_for_compute_tx "$tx_hash" 'waiting for rating by a')"
+    log result "$(jq <<< "$review_business_result")"
     local status
     status=$(jq -er '.review_business.status' <<< "$review_business_result")
 
@@ -385,29 +349,29 @@ function test_review () {
     rating="$(jq -er '.single_business.business.average_rating' <<< "$result_comparable")"
     log "rating after a rated: $rating"
     assert_eq $rating '5000'
-    log "query single business: SUCCESS!"
 
     local review_message
     review_message='{
       "review_business": {
-        "address":"'"$business_addr"'",
-        "content":"Not so good",
-        "rating":0,
-        "title":"better going somewhere else",
-        "tx_id": 5,
+        "address": "'"$business_addr"'",
+        "content": "Not so good",
+        "rating": 0,
+        "title": "D first review",
+        "tx_id": 6,
         "tx_page": 0,
         "viewing_key": "vk"
       }
     }'
 
-    tx_hash="$(compute_execute "$contract_addr" "$review_message" --from c --gas 150000 -y)"
-    review_business_result="$(data_of wait_for_compute_tx "$tx_hash" 'waiting for register_business from "c" to process')"
-    log result "$review_business_result"
+    log message "$(jq <<< "$review_message")"
+    tx_hash="$(compute_execute "$contract_addr" "$review_message" --from d --gas 150000 -y)"
+    local review_business_result
+    review_business_result="$(data_of wait_for_compute_tx "$tx_hash" "waiting for rating by d")"
+    log result "$(jq <<< "$review_business_result")"
     local status
     status=$(jq -er '.review_business.status' <<< "$review_business_result")
 
     assert_eq "$status" "Successfully added a new review on business, receipt was accounted for"
-    log "review business from c: SUCCESS!"
 
     local query_single_business_message
     query_single_business_message='{
@@ -418,11 +382,130 @@ function test_review () {
 
     result="$(compute_query "$contract_addr" "$query_single_business_message" 2>&1 || true )"
     result_comparable=$(echo $result | sed 's/ Usage:.*//')
-    assert_eq "$result_comparable" '{"single_business":{"business":{"name":"Starbucks","description":"a place to eat","address":"secret1fc3fzy78ttp0lwuujw7e52rhspxn8uj52zfyne","average_rating":5000,"reviews_count":1},"status":"Successfully retrieved business by address"}}'
+    local rating
+    rating="$(jq -er '.single_business.business.average_rating' <<< "$result_comparable")"
+    log "rating after d rated: $rating"
+    assert_eq $rating '1250'
+    log "query single business: SUCCESS!"
+
+    local review_message
+    review_message='{
+      "review_business": {
+        "address": "'"$business_addr"'",
+        "content": "In the middle",
+        "rating": 3,
+        "title": "not good and not bad",
+        "tx_id": 5,
+        "tx_page": 0,
+        "viewing_key": "vk"
+      }
+    }'
+
+    log message "$(jq <<< "$review_message")"
+    tx_hash="$(compute_execute "$contract_addr" "$review_message" --from c --gas 150000 -y)"
+    review_business_result="$(data_of wait_for_compute_tx "$tx_hash" 'waiting for rating by c')"
+    log result "$(jq <<< "$review_business_result")"
+    local status
+    status=$(jq -er '.review_business.status' <<< "$review_business_result")
+
+    assert_eq "$status" "Successfully added a new review on business, receipt was accounted for"
+
+    local query_single_business_message
+    query_single_business_message='{
+      "get_single_business": {
+        "address":"'"$business_addr"'"
+      }
+    }'
+
+    log query message "$(jq <<< "$query_single_business_message")"
+    result="$(compute_query "$contract_addr" "$query_single_business_message" 2>&1 || true )"
+    result_comparable=$(echo $result | sed 's/ Usage:.*//')
     local rating
     rating="$(jq -er '.single_business.business.average_rating' <<< "$result_comparable")"
     log "rating after c rated: $rating"
-    assert_eq $rating '1666'
+    assert_eq $rating '1833'
+
+    local query_reviews_on_business
+    query_reviews_on_business='{
+      "get_reviews_on_business": {
+        "business_address":"'"$business_addr"'",
+        "page_size": 8
+      }
+    }'
+
+    log query message "$(jq <<< "$query_reviews_on_business")"
+    result="$(compute_query "$contract_addr" "$query_reviews_on_business" 2>&1 || true )"
+    result_comparable=$(echo $result | sed 's/ Usage:.*//')
+    local reviews
+    reviews="$(jq -er '' <<< "$result_comparable")"
+    log "all reviews after c rated: $reviews"
+
+    local review_message
+    review_message='{
+      "review_business": {
+        "address": "'"$business_addr"'",
+        "content": "second time was amazing",
+        "rating": 5,
+        "title": "2nd time is the charm",
+        "tx_id": 7,
+        "tx_page": 0,
+        "viewing_key": "vk"
+      }
+    }'
+
+    log message "$(jq <<< "$review_message")"
+    tx_hash="$(compute_execute "$contract_addr" "$review_message" --from d --gas 150000 -y)"
+    review_business_result="$(data_of wait_for_compute_tx "$tx_hash" 'waiting for 2nd rating by d')"
+    log result "$(jq <<< "$review_business_result")"
+    local status
+    status=$(jq -er '.review_business.status' <<< "$review_business_result")
+
+    assert_eq "$status" "Successfully updated a previous review on business, receipt was accounted for"
+
+    local query_single_business_message
+    query_single_business_message='{
+      "get_single_business": {
+        "address":"'"$business_addr"'"
+      }
+    }'
+
+    log query message "$(jq <<< "$query_single_business_message")"
+    result="$(compute_query "$contract_addr" "$query_single_business_message" 2>&1 || true )"
+    result_comparable=$(echo $result | sed 's/ Usage:.*//')
+    local rating
+    rating="$(jq -er '.single_business.business.average_rating' <<< "$result_comparable")"
+    log "rating after 2nd time d rated: $rating"
+    assert_eq $rating '4428'
+
+    local query_reviews_on_business
+    query_reviews_on_business='{
+      "get_reviews_on_business": {
+        "business_address":"'"$business_addr"'",
+        "page_size": 8
+      }
+    }'
+
+    log query message "$(jq <<< "$query_reviews_on_business")"
+    result="$(compute_query "$contract_addr" "$query_reviews_on_business" 2>&1 || true )"
+    result_comparable=$(echo $result | sed 's/ Usage:.*//')
+    local reviews
+    reviews="$(jq -er '' <<< "$result_comparable")"
+    log "all reviews after d rated for 2nd time: $reviews"
+
+    local query_all_businesses
+    query_all_businesses='{
+      "get_businesses": {
+        "page_size": 8
+      }
+    }'
+
+    log query message "$(jq <<< "$query_all_businesses")"
+    result="$(compute_query "$contract_addr" "$query_all_businesses" 2>&1 || true )"
+    result_comparable=$(echo $result | sed 's/ Usage:.*//')
+    local businesses
+    businesses="$(jq -er '' <<< "$result_comparable")"
+    log "all businesses query result: $businesses"
+
     log "query single business: SUCCESS!"
 }
 
@@ -499,9 +582,15 @@ function main() {
     local business_address
     business_address="secret1fc3fzy78ttp0lwuujw7e52rhspxn8uj52zfyne"
 
+    log
+    log "################ DEMO ####################"
     test_register_business "$contract_addr" "$business_address"
+    test_reviews "$contract_addr" "$business_address"
+
+    log
+    log "########### VALIDATIONS ##################"
+    # test_review_unexistent_tx "$contract_addr" "$business_address"
     # test_register_existing_business "$contract_addr" "$business_address"
-    test_review "$contract_addr" "$business_address"
     # test_register_business_long_name "$contract_addr"
     # test_register_business_long_description "$contract_addr"
     # test_register_business_long_description "$contract_addr"

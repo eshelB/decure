@@ -9,7 +9,7 @@ use crate::state::{
     apply_review_on_business, create_business, create_review, get_business_by_address,
     get_businesses_page, get_reviews_on_business, may_load_review, Business, Review,
 };
-use crate::utils::recalculate_weighted_average;
+use crate::utils::{recalculate_weighted_average, result_add};
 
 // constants:
 const MAX_DESCRIPTION_LENGTH: u8 = 40;
@@ -117,18 +117,20 @@ fn review_business<S: Storage, A: Api, Q: Querier>(
     if !base_review.tx_ids.contains(&tx_id) {
         status.push_str(", receipt was accounted for");
 
-        // todo use real tx
-        query_snip20_tx(
+        let tx = query_snip20_tx(
             &deps.querier,
             tx_id,
             viewing_key,
             tx_page,
             &env.message.sender,
         )?;
-        new_weight_from_tx = 20;
+
+        // todo validate tx sender and receiver
+        new_weight_from_tx = tx.coins.amount.u128();
 
         println!("tx_page {}", tx_page);
-        base_review.weight = Uint128::from(base_review.weight.u128() + new_weight_from_tx);
+        base_review.weight =
+            Uint128::from(result_add(base_review.weight.u128(), new_weight_from_tx)?);
         base_review.tx_ids.push(tx_id);
     } else {
         status.push_str(", specified receipt was already used");

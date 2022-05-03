@@ -52,7 +52,7 @@ pub fn recalculate_weighted_average(
     Ok((new_average, new_total_weight))
 }
 
-fn result_add(lhs: u128, rhs: u128) -> StdResult<u128> {
+pub fn result_add(lhs: u128, rhs: u128) -> StdResult<u128> {
     lhs.checked_add(rhs)
         .ok_or(StdError::generic_err("overflow in addition"))
 }
