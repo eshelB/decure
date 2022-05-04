@@ -3,8 +3,7 @@
 A platform for reliable customer reviews and ratings on any business that accepts payment in
 SNIP-20 tokens. Powered by Secret Network, privacy is preserved for reviewers.
 
-This example demonstrates how to query different contracts, and how to use [CashMap]
-(https://github.com/scrtlabs/secret-toolkit/tree/master/packages/incubator) - the only
+This example demonstrates how to query different contracts, and how to use [CashMap](https://github.com/scrtlabs/secret-toolkit/tree/master/packages/incubator) - the only
 KV data structure in secret that can be iterated through (other KV data structures cannot, because
 keys are not known in advance).
 
@@ -23,7 +22,7 @@ by providing a snip-20 receipt.
 2) Incentive to rate and review: customers have to pay the network fee and gas fees for rating.
    This price could be mitigated by an option to let the business being reviewed refund the fees.
    This could further improve the business' reputation
----
+
 ## Interacting with the contract
 ### Register a Business
 A Business must be registered to be able to review it. Anyone can register an address as a business.
@@ -176,7 +175,6 @@ secretcli q compute query <contract-address> "$message"
 
 Or you can query a single business.
 
----
 ## Contract data structures
 
 We use secret-toolkit's `CashMap` (incubator feature) to save our businesses and reviews.
