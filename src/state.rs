@@ -62,12 +62,12 @@ pub fn apply_review_on_business<S: Storage>(
 
 pub fn get_businesses_page<S: ReadonlyStorage>(
     store: &S,
-    start: Option<u32>,
+    page: Option<u32>,
     page_size: u32,
 ) -> StdResult<(Vec<Business>, u32)> {
     let all_businesses = ReadOnlyCashMap::init(KEY_BUSINESSES, store);
 
-    let businesses_page: Vec<Business> = all_businesses.paging(start.unwrap_or(0), page_size)?;
+    let businesses_page: Vec<Business> = all_businesses.paging(page.unwrap_or(0), page_size)?;
     let businesses_len: u32 = all_businesses.len();
 
     Ok((businesses_page, businesses_len))
@@ -131,7 +131,7 @@ pub fn create_review<S: Storage>(
 pub fn get_reviews_on_business<S: Storage>(
     store: &S,
     business_address: &HumanAddr,
-    start: Option<u32>,
+    page: Option<u32>,
     page_size: u32,
 ) -> StdResult<(Vec<DisplayedReview>, u32)> {
     let mut namespace = String::from(PREFIX_REVIEWS);
@@ -139,7 +139,7 @@ pub fn get_reviews_on_business<S: Storage>(
     let namespace: &[u8] = namespace.as_bytes();
 
     let reviews_on_business: ReadOnlyCashMap<Review, S> = ReadOnlyCashMap::init(namespace, store);
-    let reviews_page: Vec<Review> = reviews_on_business.paging(start.unwrap_or(0), page_size)?;
+    let reviews_page: Vec<Review> = reviews_on_business.paging(page.unwrap_or(0), page_size)?;
 
     let displayed_page: Vec<DisplayedReview> = reviews_page
         .iter()

@@ -219,24 +219,24 @@ fn register_business<S: Storage, A: Api, Q: Querier>(
 
 pub fn query<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>, msg: QueryMsg) -> QueryResult {
     match msg {
-        QueryMsg::GetBusinesses { start, page_size } => {
-            query_businesses(&deps.storage, start, page_size)
+        QueryMsg::GetBusinesses { page, page_size } => {
+            query_businesses(&deps.storage, page, page_size)
         }
         QueryMsg::GetSingleBusiness { address } => query_business(&deps.storage, address),
         QueryMsg::GetReviewsOnBusiness {
             business_address,
-            start,
+            page,
             page_size,
-        } => query_reviews(&deps.storage, business_address, start, page_size),
+        } => query_reviews(&deps.storage, business_address, page, page_size),
     }
 }
 
 pub fn query_businesses<S: Storage>(
     store: &S,
-    start: Option<u32>,
+    page: Option<u32>,
     page_size: u32,
 ) -> StdResult<Binary> {
-    let (businesses_in_range, total) = get_businesses_page(store, start, page_size)?;
+    let (businesses_in_range, total) = get_businesses_page(store, page, page_size)?;
     let displayed_businesses = businesses_in_range
         .iter()
         .map(|b| DisplayedBusiness {
@@ -277,11 +277,10 @@ pub fn query_business<S: Storage>(store: &S, address: HumanAddr) -> StdResult<Bi
 pub fn query_reviews<S: Storage>(
     store: &S,
     business_address: HumanAddr,
-    start: Option<u32>,
+    page: Option<u32>,
     page_size: u32,
 ) -> StdResult<Binary> {
-    let (reviews_page, total) =
-        get_reviews_on_business(store, &business_address, start, page_size)?;
+    let (reviews_page, total) = get_reviews_on_business(store, &business_address, page, page_size)?;
 
     to_binary(&QueryAnswer::Reviews {
         reviews: reviews_page,
@@ -386,7 +385,7 @@ mod tests {
 
         // QUERY
         let msg = QueryMsg::GetBusinesses {
-            start: Some(1),
+            page: Some(1),
             page_size: 2,
         };
 

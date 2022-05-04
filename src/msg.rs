@@ -36,7 +36,7 @@ pub enum HandleAnswer {
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
     GetBusinesses {
-        start: Option<u32>,
+        page: Option<u32>,
         page_size: u32,
     },
     GetSingleBusiness {
@@ -44,7 +44,7 @@ pub enum QueryMsg {
     },
     GetReviewsOnBusiness {
         business_address: HumanAddr,
-        start: Option<u32>,
+        page: Option<u32>,
         page_size: u32,
     },
 }

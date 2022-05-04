@@ -12,11 +12,14 @@ function secretcli() {
     set -e
     local container_name="mydev1"
 
+    # local res
     if [[ -z "${IS_GITHUB_ACTIONS+x}" ]]; then
       docker exec $container_name /usr/bin/secretd "$@"
     else
       SGX_MODE=SW /usr/local/bin/secretcli "$@"
     fi
+
+    # echo "$res"
 }
 
 # Just like `echo`, but prints to stderr
@@ -69,7 +72,7 @@ function wait_for_tx() {
 
     local result
 
-    log "waiting on tx: $tx_hash"
+    log "waiting for tx: $tx_hash"
     # secretcli will only print to stdout when it succeeds
     until result="$(secretcli query tx "$tx_hash" 2>/dev/null)"; do
         log "$message"
@@ -219,234 +222,6 @@ function create_contract() {
     echo "$result"
 }
 
-function log_test_header() {
-    log " ########### Starting ${FUNCNAME[1]} ###############################################################################################################################################"
-}
-
-function sign_permit() {
-    set -e
-    local permit="$1"
-    local key="$2"
-
-    local sig
-    if [[ -z "${IS_GITHUB_ACTIONS+x}" ]]; then
-      sig=$(docker exec secretdev bash -c "/usr/bin/secretd tx sign-doc <(echo '"$permit"') --from '$key'")
-    else
-      sig=$(secretcli tx sign-doc <(echo "$permit") --from "$key")
-    fi
-
-    echo "$sig"
-}
-
-function test_query_with_permit_after() {
-    set -e
-    local contract_addr="$1"
-
-    log_test_header
-
-    # common variables
-    local result
-    local tx_hash
-
-    local permit
-    local permit_query
-    local expected_output
-    local sig
-    permit='{"account_number":"0","sequence":"0","chain_id":"blabla","msgs":[{"type":"query_permit","value":{"permit_name":"test","allowed_tokens":["'"$contract_addr"'"],"permissions":["calculation_history"]}}],"fee":{"amount":[{"denom":"uscrt","amount":"0"}],"gas":"1"},"memo":""}'
-
-    key=a
-    expected_output='{"calculation_history":{"calcs":[{"left_operand":"23","right_operand":null,"operation":"Sqrt","result":"4"},{"left_operand":"23","right_operand":"3","operation":"Div","result":"7"},{"left_operand":"23","right_operand":"3","operation":"Mul","result":"69"}],"total":"5"}}'
-
-    sig=$(sign_permit "$permit" "$key")
-    permit_query='{"with_permit":{"query":{"calculation_history":{"page_size":"3"}},"permit":{"params":{"permit_name":"test","chain_id":"blabla","allowed_tokens":["'"$contract_addr"'"],"permissions":["calculation_history"]},"signature":'"$sig"'}}}'
-    result="$(compute_query "$contract_addr" "$permit_query" 2>&1 || true )"
-    result_comparable=$(echo $result | sed 's/ Usage:.*//')
-    assert_eq "$result_comparable" "$expected_output"
-    log "query result populated history: ASSERTION_SUCCESS"
-
-    key=b
-    expected_output='{"calculation_history":{"calcs":[],"total":"0"}}'
-
-    sig=$(sign_permit "$permit" "$key")
-    permit_query='{"with_permit":{"query":{"calculation_history":{"page_size":"3"}},"permit":{"params":{"permit_name":"test","chain_id":"blabla","allowed_tokens":["'"$contract_addr"'"],"permissions":["calculation_history"]},"signature":'"$sig"'}}}'
-    result="$(compute_query "$contract_addr" "$permit_query" 2>&1 || true )"
-    result_comparable=$(echo $result | sed 's/ Usage:.*//')
-    assert_eq "$result_comparable" "$expected_output"
-    log "query result for empty history: ASSERTION_SUCCESS"
-}
-
-function test_query() {
-    set -e
-    local contract_addr="$1"
-
-    log_test_header
-    expected_error="Error: this is the expected error"
-
-    key=a
-    result="$(compute_query "$contract_addr" "" 2>&1 || true )"
-    result_comparable=$(echo $result | sed 's/Usage:.*//' | awk '{$1=$1};1')
-
-    assert_eq "$result_comparable" "$expected_error"
-    log "no contract in permit: ASSERTION_SUCCESS"
-}
-
-function test_wrong_query_variant() {
-    set -e
-    local contract_addr="$1"
-
-    log_test_header
-    expected_error="Error: this is the expected error"
-
-    key=a
-    result="$(compute_query "$contract_addr" '{"get_count":{}}' 2>&1 || true )"
-    result_comparable=$(echo $result | sed 's/Usage:.*//' | awk '{$1=$1};1')
-
-    assert_eq "$result_comparable" "$expected_error"
-    log "wrong query variant: SUCCESS!"
-}
-
-function test_add() {
-    set -e
-    local contract_addr="$1"
-
-    log_test_header
-
-    local key="a"
-    local tx_hash
-
-    log "adding..."
-    local add_message='{"add": ["23", "3"]}'
-    tx_hash="$(compute_execute "$contract_addr" "$add_message" "--from" "$key" --gas "150000" "-y")"
-    echo "$tx_hash"
-
-    local add_response
-    add_response="$(data_of wait_for_compute_tx "$tx_hash" "waiting for add to \"$key\" to process")"
-    log "$add_response"
-
-    local expected_response
-    expected_response='"26"'
-    assert_eq "$add_response" "$expected_response"
-}
-
-function test_sub() {
-    set -e
-    local contract_addr="$1"
-
-    log_test_header
-
-    local key="a"
-    local tx_hash
-
-    log "subtracting..."
-    local sub_message='{"sub": ["23", "3"]}'
-    tx_hash="$(compute_execute "$contract_addr" "$sub_message" "--from" "$key"  --gas "150000" "-y")"
-    echo "$tx_hash"
-
-    local sub_response
-    sub_response="$(data_of wait_for_compute_tx "$tx_hash" "waiting for sub from \"$key\" to process")"
-    log "$sub_response"
-
-    local expected_response
-    expected_response='"20"'
-    assert_eq "$sub_response" "$expected_response"
-}
-
-function test_mul() {
-    set -e
-    local contract_addr="$1"
-
-    log_test_header
-
-    local key="a"
-    local tx_hash
-
-    log "multiplying..."
-    local mul_message='{"mul": ["23", "3"]}'
-    tx_hash="$(compute_execute "$contract_addr" "$mul_message" "--from" "$key" --gas "150000" "-y")"
-    echo "$tx_hash"
-
-    local mul_response
-    mul_response="$(data_of wait_for_compute_tx "$tx_hash" "waiting for mul from \"$key\" to process")"
-    log "$mul_response"
-
-    local expected_response
-    expected_response='"69"'
-    assert_eq "$mul_response" "$expected_response"
-}
-
-function test_div() {
-    set -e
-    local contract_addr="$1"
-
-    log_test_header
-
-    local key="a"
-    local tx_hash
-
-    log "dividing..."
-    local div_message='{"div": ["23", "3"]}'
-    tx_hash="$(compute_execute "$contract_addr" "$div_message" "--from" "$key" --gas "150000" "-y")"
-    echo "$tx_hash"
-
-    local div_response
-    div_response="$(data_of wait_for_compute_tx "$tx_hash" "waiting for div from \"$key\" to process")"
-    log "$div_response"
-
-    local expected_response
-    expected_response='"7"'
-    assert_eq "$div_response" "$expected_response"
-}
-
-function test_div_by_zero() {
-    set -e
-    local contract_addr="$1"
-
-    log_test_header
-
-    local key="a"
-    local tx_hash
-
-    log "dividing..."
-    local div_message='{"div": ["23", "0"]}'
-
-    tx_hash="$(compute_execute "$contract_addr" "$div_message" "--from" "$key" --gas "150000" "-y")"
-    echo "$tx_hash"
-
-    local div_response
-    # Notice the `!` before the command - it is EXPECTED to fail.
-    ! div_response="$(wait_for_compute_tx "$tx_hash" "waiting division by zero result")"
-    local div_error
-    div_error="$(get_generic_err "$div_response")"
-
-    log "$div_error"
-
-    local expected_error="Divisor can't be zero"
-    assert_eq "$div_error" "$expected_error"
-}
-
-function test_sqrt() {
-    set -e
-    local contract_addr="$1"
-
-    log_test_header
-
-    local key="a"
-    local tx_hash
-
-    log "calculating square root..."
-    local sqrt_message='{"sqrt": "23"}'
-    tx_hash="$(compute_execute "$contract_addr" "$sqrt_message" "--from" "$key" --gas "150000" "-y")"
-    echo "$tx_hash"
-
-    local sqrt_response
-    sqrt_response="$(data_of wait_for_compute_tx "$tx_hash" "waiting for sqrt from \"$key\" to process")"
-    log "$sqrt_response"
-
-    local expected_response
-    expected_response='"4"'
-    assert_eq "$sqrt_response" "$expected_response"
-}
-
 function main() {
     set -e
     log '              <####> Starting local deploy <####>'
@@ -475,11 +250,45 @@ function main() {
     contract_addr="$(create_contract "$dir" "$init_msg")"
 
     log 'snip20 initialization completed successfully'
+    local tx_hash
+
+    log 'sending some scrt to c and d since they have none'
+    tx_hash=$(tx_of secretcli tx bank send a secret1ldjxljw7v4vk6zhyduywh04hpj0jdwxsmrlatf 20uscrt -y)
+    wait_for_tx "$tx_hash" "waiting for transfer to d"
+    tx_hash=$(tx_of secretcli tx bank send a secret1ajz54hz8azwuy34qwy9fkjnfcrvf0dzswy0lqq 20uscrt -y)
+    wait_for_tx "$tx_hash" "waiting for transfer to c"
 
     log 'setting viewing key to vk'
-    secretcli tx snip20 set-viewing-key secret18vd8fpwxzck93qlwghaj6arh4p7c5n8978vsyg --from a vk
+    secretcli tx snip20 set-viewing-key secret18vd8fpwxzck93qlwghaj6arh4p7c5n8978vsyg --from a vk -y
+    secretcli tx snip20 set-viewing-key secret18vd8fpwxzck93qlwghaj6arh4p7c5n8978vsyg --from b vk -y
+    secretcli tx snip20 set-viewing-key secret18vd8fpwxzck93qlwghaj6arh4p7c5n8978vsyg --from c vk -y
+    tx_hash=$(tx_of secretcli tx snip20 set-viewing-key secret18vd8fpwxzck93qlwghaj6arh4p7c5n8978vsyg --from d vk -y)
+    wait_for_tx "$tx_hash" "waiting for viewing key setting"
 
-    return 0
+    log 'depositing some sscrt for a, c, and d'
+    secretcli tx snip20 deposit secret18vd8fpwxzck93qlwghaj6arh4p7c5n8978vsyg --amount 10uscrt --from a -y
+    secretcli tx snip20 deposit secret18vd8fpwxzck93qlwghaj6arh4p7c5n8978vsyg --amount 10uscrt --from c -y
+    tx_hash=$(tx_of secretcli tx snip20 deposit secret18vd8fpwxzck93qlwghaj6arh4p7c5n8978vsyg --amount 10uscrt --from d -y)
+    wait_for_tx "$tx_hash" "waiting for deposits"
+
+    log 'creating 4 receipts and en extra tx for validation'
+    log '1) a -> 1sscrt -> b'
+    log '2) c -> 2sscrt -> b'
+    log '3) d -> 3sscrt -> b'
+    log '4) d -> 1 more sscrt -> b'
+    log '5) a -> 1 -> c'
+
+
+    secretcli tx snip20 send secret18vd8fpwxzck93qlwghaj6arh4p7c5n8978vsyg secret1fc3fzy78ttp0lwuujw7e52rhspxn8uj52zfyne 1 --from a -y
+    secretcli tx snip20 send secret18vd8fpwxzck93qlwghaj6arh4p7c5n8978vsyg secret1fc3fzy78ttp0lwuujw7e52rhspxn8uj52zfyne 3 --from d -y
+    tx_hash=$(tx_of secretcli tx snip20 send secret18vd8fpwxzck93qlwghaj6arh4p7c5n8978vsyg secret1fc3fzy78ttp0lwuujw7e52rhspxn8uj52zfyne 2 --from c -y)
+    wait_for_tx "$tx_hash" "waiting for transfers a and c and d1"
+    tx_hash=$(tx_of secretcli tx snip20 send secret18vd8fpwxzck93qlwghaj6arh4p7c5n8978vsyg secret1fc3fzy78ttp0lwuujw7e52rhspxn8uj52zfyne 1 --from d -y)
+    secretcli tx snip20 send secret18vd8fpwxzck93qlwghaj6arh4p7c5n8978vsyg secret1ajz54hz8azwuy34qwy9fkjnfcrvf0dzswy0lqq 3 --from a -y
+    wait_for_tx "$tx_hash" "waiting for transfer d2 and a2"
+
+    log 'transactions sent to b:'
+    secretcli q snip20 transfers secret18vd8fpwxzck93qlwghaj6arh4p7c5n8978vsyg secret1fc3fzy78ttp0lwuujw7e52rhspxn8uj52zfyne vk 0 | jq
 }
 
 main "$@"

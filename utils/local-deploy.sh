@@ -354,7 +354,7 @@ function test_reviews () {
         "content": "great stuff!",
         "rating": 5,
         "title":"amazing restaurant",
-        "tx_id": 2,
+        "tx_id": 4,
         "tx_page": 0,
         "viewing_key": "vk"
       }
@@ -391,7 +391,7 @@ function test_reviews () {
         "content": "Not so good",
         "rating": 0,
         "title": "D first review",
-        "tx_id": 6,
+        "tx_id": 5,
         "tx_page": 0,
         "viewing_key": "vk"
       }
@@ -429,7 +429,7 @@ function test_reviews () {
         "content": "In the middle",
         "rating": 3,
         "title": "not good and not bad",
-        "tx_id": 5,
+        "tx_id": 6,
         "tx_page": 0,
         "viewing_key": "vk"
       }
