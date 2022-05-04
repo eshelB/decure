@@ -4,8 +4,8 @@ A platform for reliable customer reviews and ratings on any business that accept
 SNIP-20 tokens. Powered by Secret Network, privacy is preserved for reviewers.
 
 This example demonstrates how to query different contracts, and how to use [CashMap](https://github.com/scrtlabs/secret-toolkit/tree/master/packages/incubator) - the only
-KV data structure in secret that can be iterated through (other KV data structures cannot, because
-keys are not known in advance).
+key-value data structure in secret that can be iterated through (other key-value data structures cannot,
+because keys are not known in advance).
 
 ### Why are ratings and reviews here trustworthy?
 
