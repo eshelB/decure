@@ -14,8 +14,13 @@ use crate::utils::{recalculate_weighted_average, result_add};
 // constants:
 const MAX_DESCRIPTION_LENGTH: u8 = 40;
 const MAX_NAME_LENGTH: u8 = 20;
-const MIN_RATING: u8 = 0;
 const MAX_RATING: u8 = 5;
+
+struct Receipt {
+    tx_id: u64,
+    tx_page: u32,
+    viewing_key: String,
+}
 
 pub fn init<S: Storage, A: Api, Q: Querier>(
     _deps: &mut Extern<S, A, Q>,
@@ -45,17 +50,14 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             tx_id,
             tx_page,
             viewing_key,
-        } => review_business(
-            deps,
-            env,
-            address,
-            content,
-            rating,
-            title,
-            tx_id,
-            tx_page,
-            viewing_key,
-        )?,
+        } => {
+            let receipt = Receipt {
+                tx_id,
+                tx_page,
+                viewing_key,
+            };
+            review_business(deps, env, address, content, rating, title, receipt)?
+        }
     };
 
     Ok(HandleResponse {
@@ -72,22 +74,22 @@ fn review_business<S: Storage, A: Api, Q: Querier>(
     content: String,
     rating: u8,
     title: String,
-    tx_id: u64,
-    tx_page: u32,
-    viewing_key: String,
+    receipt: Receipt,
 ) -> StdResult<HandleAnswer> {
-    if rating < MIN_RATING || rating > MAX_RATING {
-        return Err(StdError::generic_err(
-            "ratings must be between 0 and 5 stars",
-        ));
+    if rating > MAX_RATING {
+        return Err(StdError::generic_err(format!(
+            "ratings must be between 0 and {} stars",
+            MAX_RATING
+        )));
     }
 
     let mut status;
 
-    let existing_business =
-        get_business_by_address(&deps.storage, &address)?.ok_or(StdError::generic_err(
+    let existing_business = get_business_by_address(&deps.storage, &address)?.ok_or_else(|| {
+        StdError::generic_err(
             "There is no business registered on that address. You can register it instead.",
-        ))?;
+        )
+    })?;
 
     let previous_review = may_load_review(&deps.storage, &address, &env.message.sender);
 
@@ -114,14 +116,14 @@ fn review_business<S: Storage, A: Api, Q: Querier>(
     let previous_rating = base_review.rating;
 
     let mut new_weight_from_tx = 0;
-    if !base_review.tx_ids.contains(&tx_id) {
+    if !base_review.tx_ids.contains(&receipt.tx_id) {
         status.push_str(", receipt was accounted for");
 
         let tx = query_snip20_tx(
             &deps.querier,
-            tx_id,
-            viewing_key,
-            tx_page,
+            receipt.tx_id,
+            receipt.viewing_key,
+            receipt.tx_page,
             &env.message.sender,
         )?;
 
@@ -138,10 +140,9 @@ fn review_business<S: Storage, A: Api, Q: Querier>(
         }
         new_weight_from_tx = tx.coins.amount.u128();
 
-        println!("tx_page {}", tx_page);
         base_review.weight =
             Uint128::from(result_add(base_review.weight.u128(), new_weight_from_tx)?);
-        base_review.tx_ids.push(tx_id);
+        base_review.tx_ids.push(receipt.tx_id);
     } else {
         status.push_str(", specified receipt was already used");
     }
@@ -243,8 +244,8 @@ pub fn query_businesses<S: Storage>(
             name: b.name.clone(),
             description: b.description.clone(),
             address: b.address.clone(),
-            average_rating: b.average_rating.clone(),
-            reviews_count: b.reviews_count.clone(),
+            average_rating: b.average_rating,
+            reviews_count: b.reviews_count,
         })
         .collect();
 

@@ -26,9 +26,9 @@ pub fn create_business<S: Storage>(store: &mut S, business: Business) -> StdResu
         all_businesses.get(business.address.as_str().as_bytes());
 
     match existing_business {
-        Some(..) => Err(StdError::generic_err(format!(
-            "A business is already registered on that address",
-        ))),
+        Some(..) => Err(StdError::generic_err(
+            "A business is already registered on that address".to_string(),
+        )),
         None => {
             all_businesses.insert(business.address.as_str().as_bytes(), business.clone())?;
             Ok(())
@@ -108,7 +108,7 @@ pub fn may_load_review<S: Storage>(
 
     let reviews_on_business: ReadOnlyCashMap<Review, S> = ReadOnlyCashMap::init(namespace, store);
 
-    reviews_on_business.get(&reviewer_address.as_str().as_bytes())
+    reviews_on_business.get(reviewer_address.as_str().as_bytes())
 }
 
 pub fn create_review<S: Storage>(
@@ -146,7 +146,7 @@ pub fn get_reviews_on_business<S: Storage>(
         .map(|review: &Review| DisplayedReview {
             title: review.title.clone(),
             content: review.content.clone(),
-            rating: review.rating.clone(),
+            rating: review.rating,
             last_update_timestamp: review.last_update_timestamp,
         })
         .collect();

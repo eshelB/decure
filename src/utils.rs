@@ -54,20 +54,20 @@ pub fn recalculate_weighted_average(
 
 pub fn result_add(lhs: u128, rhs: u128) -> StdResult<u128> {
     lhs.checked_add(rhs)
-        .ok_or(StdError::generic_err("overflow in addition"))
+        .ok_or_else(|| StdError::generic_err("overflow in addition"))
 }
 
 fn result_mul(lhs: u128, rhs: u128) -> StdResult<u128> {
     lhs.checked_mul(rhs)
-        .ok_or(StdError::generic_err("overflow in multiplication"))
+        .ok_or_else(|| StdError::generic_err("overflow in multiplication"))
 }
 
 fn result_sub(lhs: u128, rhs: u128) -> StdResult<u128> {
     lhs.checked_sub(rhs)
-        .ok_or(StdError::generic_err("underflow in subtraction"))
+        .ok_or_else(|| StdError::generic_err("underflow in subtraction"))
 }
 
 fn result_div(lhs: u128, rhs: u128) -> StdResult<u128> {
     lhs.checked_div(rhs)
-        .ok_or(StdError::generic_err("underflow in division"))
+        .ok_or_else(|| StdError::generic_err("underflow in division"))
 }
