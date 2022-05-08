@@ -18,6 +18,15 @@ jobs:
           # make file runnable, might not be necessary
           chmod +x "./tests/integration.sh"
 
+          # todo remove, looking up testing current directory
+          pwd
+
+          # todo remove, verifying docker exists
+          docker
+
+          // install snip-20 contract
+          git clone
+
           wget -q https://github.com/scrtlabs/SecretNetwork/releases/download/v1.2.5/secretnetwork_1.2.6vr_rocksdb_amd64.deb
           sudo dpkg -i secret*.deb
           echo installed secretcli with version "$(secretcli version)"
