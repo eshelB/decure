@@ -595,7 +595,18 @@ function main() {
     log "built optimized contract"
     log "the result of the optimization is: $optimizer_result"
 
-    docker cp ./contract.wasm.gz "$container_hash":/root/code
+
+    local dir
+    if [[ -z "${IS_GITHUB_ACTIONS+x}" ]]; then
+      local container_hash
+      container_hash=$(docker ps | grep mydev | cut -d " " -f 1)
+      log "the container hash is $container_hash"
+      docker cp ./contract.wasm.gz "$container_hash":/root/code
+      dir="code"
+    else
+      dir="$(pwd)"
+    fi
+
     log "copied contract wasm to container"
 
     local init_msg
