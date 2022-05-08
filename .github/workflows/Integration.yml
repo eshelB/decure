@@ -45,7 +45,9 @@ jobs:
           echo "${{ secrets.D_MNEMONICS }}" | secretcli keys add d --recover
 
           # run script
-          SNIP20_DIR="$(pwd)"/snip20-reference-impl "./integration-tests/deploy-snip20.sh"
+          export SNIP20_DIR="$(pwd)"/snip20-reference-impl
+          echo "$SNIP20_DIR"
+          "./integration-tests/deploy-snip20.sh"
           "./integration-tests/integration.sh"
     services:
       secretdev:
