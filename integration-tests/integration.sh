@@ -611,7 +611,6 @@ function main() {
 
     local init_msg
     init_msg='{}'
-    dir="code"
     contract_addr="$(create_contract "$dir" "$init_msg")"
 
     local business_address
