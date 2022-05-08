@@ -19,7 +19,7 @@ jobs:
           chmod +x "./integration-tests/deploy-snip20.sh"
           chmod +x "./integration-tests/integration.sh"
 
-          // install snip-20 contract
+          # install snip-20 contract
           git clone https://github.com/scrtlabs/snip20-reference-impl
 
           wget -q https://github.com/scrtlabs/SecretNetwork/releases/download/v1.2.5/secretnetwork_1.2.6vr_rocksdb_amd64.deb
