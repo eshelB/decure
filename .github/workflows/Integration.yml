@@ -16,7 +16,8 @@ jobs:
           SGX_MODE: "SW"
         run: |
           # make file runnable, might not be necessary
-          chmod +x "./tests/integration.sh"
+          chmod +x "./integration-tests/deploy-snip-20.sh"
+          chmod +x "./integration-tests/integration.sh"
 
           # todo remove, looking up testing current directory
           pwd
