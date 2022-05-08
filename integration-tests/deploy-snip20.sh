@@ -227,26 +227,34 @@ function main() {
     log '              <####> Starting local deploy <####>'
     log "secretcli version in the docker image is: $(secretcli version)"
 
-    local container_hash
-    container_hash=$(docker ps | grep mydev | cut -d " " -f 1)
-
-    local current_dir
-    current_dir=$(pwd)
-
-    # this script should only be run from the project's root dir
-    assert_eq "$current_dir" "/home/esh/Development/projects/decure"
+    local snip20_dir
+    snip20_dir="$SNIP20_DIR""/snip20-reference-impl"
+    log snip dir "$snip20_dir"
 
     # build optimized contract
     log "building contract in optimizer docker"
+    docker run --rm -v "$snip20_dir":/contract \
+    --mount type=volume,source="$(basename "$snip20_dir")_cache",target=/code/target \
+    --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
+    enigmampc/secret-contract-optimizer
+    log "built contract"
 
-    docker cp /home/esh/WebstormProjects/public-clones/snip20/contract.wasm.gz "$container_hash":/root/code
-    log "copied contract wasm to container"
+    local dir
+    if [[ -z "${IS_GITHUB_ACTIONS+x}" ]]; then
+      local container_hash
+      container_hash=$(docker ps | grep mydev | cut -d " " -f 1)
+      log "the container hash is $container_hash"
+      docker cp "$snip20_dir"/contract.wasm.gz "$container_hash":/root/code
+      dir="code"
+    else
+      log github actions
+      dir="$snip20_dir"
+    fi
 
     local prng_seed
     prng_seed="$(base64 <<<'enigma-rocks')"
     local init_msg
     init_msg='{"name":"secret-secret","admin":"secret1ap26qrlp8mcq2pg6r47w43l0y8zkqm8a450s03","symbol":"SSCRT","decimals":6,"initial_balances":[],"prng_seed":"'"$prng_seed"'","config":{"public_total_supply":true,"enable_deposit":true,"enable_redeem":true,"enable_mint":true,"enable_burn":true}}'
-    dir="code"
     contract_addr="$(create_contract "$dir" "$init_msg")"
 
     log 'snip20 initialization completed successfully'
@@ -259,16 +267,16 @@ function main() {
     wait_for_tx "$tx_hash" "waiting for transfer to c"
 
     log 'setting viewing key to vk'
-    secretcli tx snip20 set-viewing-key secret18vd8fpwxzck93qlwghaj6arh4p7c5n8978vsyg --from a vk -y
-    secretcli tx snip20 set-viewing-key secret18vd8fpwxzck93qlwghaj6arh4p7c5n8978vsyg --from b vk -y
-    secretcli tx snip20 set-viewing-key secret18vd8fpwxzck93qlwghaj6arh4p7c5n8978vsyg --from c vk -y
-    tx_hash=$(tx_of secretcli tx snip20 set-viewing-key secret18vd8fpwxzck93qlwghaj6arh4p7c5n8978vsyg --from d vk -y)
+    secretcli tx snip20 set-viewing-key "$contract_addr" --from a vk -y
+    secretcli tx snip20 set-viewing-key "$contract_addr" --from b vk -y
+    secretcli tx snip20 set-viewing-key "$contract_addr" --from c vk -y
+    tx_hash=$(tx_of secretcli tx snip20 set-viewing-key "$contract_addr" --from d vk -y)
     wait_for_tx "$tx_hash" "waiting for viewing key setting"
 
     log 'depositing some sscrt for a, c, and d'
-    secretcli tx snip20 deposit secret18vd8fpwxzck93qlwghaj6arh4p7c5n8978vsyg --amount 10uscrt --from a -y
-    secretcli tx snip20 deposit secret18vd8fpwxzck93qlwghaj6arh4p7c5n8978vsyg --amount 10uscrt --from c -y
-    tx_hash=$(tx_of secretcli tx snip20 deposit secret18vd8fpwxzck93qlwghaj6arh4p7c5n8978vsyg --amount 10uscrt --from d -y)
+    secretcli tx snip20 deposit "$contract_addr" --amount 10uscrt --from a -y
+    secretcli tx snip20 deposit "$contract_addr" --amount 10uscrt --from c -y
+    tx_hash=$(tx_of secretcli tx snip20 deposit "$contract_addr" --amount 10uscrt --from d -y)
     wait_for_tx "$tx_hash" "waiting for deposits"
 
     log 'creating 4 receipts and en extra tx for validation'
@@ -278,17 +286,16 @@ function main() {
     log '4) d -> 1 more sscrt -> b'
     log '5) a -> 1 -> c'
 
-
-    secretcli tx snip20 send secret18vd8fpwxzck93qlwghaj6arh4p7c5n8978vsyg secret1fc3fzy78ttp0lwuujw7e52rhspxn8uj52zfyne 1 --from a -y
-    secretcli tx snip20 send secret18vd8fpwxzck93qlwghaj6arh4p7c5n8978vsyg secret1fc3fzy78ttp0lwuujw7e52rhspxn8uj52zfyne 3 --from d -y
-    tx_hash=$(tx_of secretcli tx snip20 send secret18vd8fpwxzck93qlwghaj6arh4p7c5n8978vsyg secret1fc3fzy78ttp0lwuujw7e52rhspxn8uj52zfyne 2 --from c -y)
+    secretcli tx snip20 send "$contract_addr" secret1fc3fzy78ttp0lwuujw7e52rhspxn8uj52zfyne 1 --from a -y
+    secretcli tx snip20 send "$contract_addr" secret1fc3fzy78ttp0lwuujw7e52rhspxn8uj52zfyne 3 --from d -y
+    tx_hash=$(tx_of secretcli tx snip20 send "$contract_addr" secret1fc3fzy78ttp0lwuujw7e52rhspxn8uj52zfyne 2 --from c -y)
     wait_for_tx "$tx_hash" "waiting for transfers a and c and d1"
-    tx_hash=$(tx_of secretcli tx snip20 send secret18vd8fpwxzck93qlwghaj6arh4p7c5n8978vsyg secret1fc3fzy78ttp0lwuujw7e52rhspxn8uj52zfyne 1 --from d -y)
-    secretcli tx snip20 send secret18vd8fpwxzck93qlwghaj6arh4p7c5n8978vsyg secret1ajz54hz8azwuy34qwy9fkjnfcrvf0dzswy0lqq 3 --from a -y
+    tx_hash=$(tx_of secretcli tx snip20 send "$contract_addr" secret1fc3fzy78ttp0lwuujw7e52rhspxn8uj52zfyne 1 --from d -y)
+    secretcli tx snip20 send "$contract_addr" secret1ajz54hz8azwuy34qwy9fkjnfcrvf0dzswy0lqq 3 --from a -y
     wait_for_tx "$tx_hash" "waiting for transfer d2 and a2"
 
     log 'transactions sent to b:'
-    secretcli q snip20 transfers secret18vd8fpwxzck93qlwghaj6arh4p7c5n8978vsyg secret1fc3fzy78ttp0lwuujw7e52rhspxn8uj52zfyne vk 0 | jq
+    secretcli q snip20 transfers "$contract_addr" secret1fc3fzy78ttp0lwuujw7e52rhspxn8uj52zfyne vk 0 | jq
 }
 
 main "$@"

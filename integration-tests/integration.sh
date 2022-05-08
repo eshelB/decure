@@ -583,16 +583,6 @@ function main() {
     log "secretcli version in the docker image is: $(secretcli version)"
     secretcli config output json
 
-    local container_hash
-    container_hash=$(docker ps | grep mydev | cut -d " " -f 1)
-    log "the container hash is $container_hash"
-
-    local current_dir
-    current_dir=$(pwd)
-
-    # this script should only be run from the project's root dir
-    assert_eq "$current_dir" "/home/esh/Development/projects/decure"
-
     # build optimized contract
     log "building contract in optimizer docker"
     docker run --rm -v "$(pwd)":/contract \
