@@ -25,14 +25,16 @@ pub enum HandleMsg {
     },
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cfg_attr(test, derive(Deserialize))]
 #[serde(rename_all = "snake_case")]
 pub enum HandleAnswer {
     RegisterBusiness { status: String },
     ReviewBusiness { status: String },
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cfg_attr(test, derive(Serialize))]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
     GetBusinesses {
@@ -49,7 +51,8 @@ pub enum QueryMsg {
     },
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cfg_attr(test, derive(Deserialize))]
 #[serde(rename_all = "snake_case")]
 pub struct DisplayedReview {
     pub title: String,
@@ -58,7 +61,8 @@ pub struct DisplayedReview {
     pub last_update_timestamp: u64,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cfg_attr(test, derive(Deserialize))]
 #[serde(rename_all = "snake_case")]
 pub struct DisplayedBusiness {
     pub name: String,
@@ -84,10 +88,4 @@ pub enum QueryAnswer {
         reviews: Vec<DisplayedReview>,
         total: u32,
     },
-}
-
-// We define a custom struct for each query response
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct CountResponse {
-    pub count: String,
 }

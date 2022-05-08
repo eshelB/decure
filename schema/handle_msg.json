@@ -5,33 +5,83 @@
     {
       "type": "object",
       "required": [
-        "increment"
+        "register_business"
       ],
       "properties": {
-        "increment": {
-          "type": "object"
+        "register_business": {
+          "type": "object",
+          "required": [
+            "address",
+            "description",
+            "name"
+          ],
+          "properties": {
+            "address": {
+              "$ref": "#/definitions/HumanAddr"
+            },
+            "description": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            }
+          }
         }
       }
     },
     {
       "type": "object",
       "required": [
-        "reset"
+        "review_business"
       ],
       "properties": {
-        "reset": {
+        "review_business": {
           "type": "object",
           "required": [
-            "count"
+            "address",
+            "content",
+            "rating",
+            "title",
+            "tx_id",
+            "tx_page",
+            "viewing_key"
           ],
           "properties": {
-            "count": {
+            "address": {
+              "$ref": "#/definitions/HumanAddr"
+            },
+            "content": {
+              "type": "string"
+            },
+            "rating": {
               "type": "integer",
-              "format": "int32"
+              "format": "uint8",
+              "minimum": 0.0
+            },
+            "title": {
+              "type": "string"
+            },
+            "tx_id": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            },
+            "tx_page": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            },
+            "viewing_key": {
+              "type": "string"
             }
           }
         }
       }
     }
-  ]
+  ],
+  "definitions": {
+    "HumanAddr": {
+      "type": "string"
+    }
+  }
 }

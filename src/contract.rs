@@ -67,6 +67,12 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     })
 }
 
+/* This handle variant is used both for reviewing and updating previous reviews.
+If a review already exists for that reviewer on that business, then the review
+and rating get updated. If the function was triggered with a new receipt, its
+weight is added to the previous reviewer's weight. If the reviewer wants to
+edit the review but has no new transactions with the business, then simply
+sending the same tx_id will update the review. */
 fn review_business<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,

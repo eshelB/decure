@@ -5,13 +5,88 @@
     {
       "type": "object",
       "required": [
-        "get_count"
+        "get_businesses"
       ],
       "properties": {
-        "get_count": {
-          "type": "object"
+        "get_businesses": {
+          "type": "object",
+          "required": [
+            "page_size"
+          ],
+          "properties": {
+            "page": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint32",
+              "minimum": 0.0
+            },
+            "page_size": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "get_single_business"
+      ],
+      "properties": {
+        "get_single_business": {
+          "type": "object",
+          "required": [
+            "address"
+          ],
+          "properties": {
+            "address": {
+              "$ref": "#/definitions/HumanAddr"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "get_reviews_on_business"
+      ],
+      "properties": {
+        "get_reviews_on_business": {
+          "type": "object",
+          "required": [
+            "business_address",
+            "page_size"
+          ],
+          "properties": {
+            "business_address": {
+              "$ref": "#/definitions/HumanAddr"
+            },
+            "page": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint32",
+              "minimum": 0.0
+            },
+            "page_size": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            }
+          }
         }
       }
     }
-  ]
+  ],
+  "definitions": {
+    "HumanAddr": {
+      "type": "string"
+    }
+  }
 }
